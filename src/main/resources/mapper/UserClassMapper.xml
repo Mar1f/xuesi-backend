@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xuesi.xuesisi.mapper.UserClassMapper">
+
+    <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.UserClass">
+            <id property="userId" column="userId" jdbcType="BIGINT"/>
+            <id property="classId" column="classId" jdbcType="BIGINT"/>
+            <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        userId,classId,createTime
+    </sql>
+</mapper>

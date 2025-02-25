@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xuesi.xuesisi.mapper.QuestionTagMapper">
+
+    <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.QuestionTag">
+            <id property="questionId" column="questionId" jdbcType="BIGINT"/>
+            <id property="tagId" column="tagId" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        questionId,tagId
+    </sql>
+</mapper>
