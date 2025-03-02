@@ -7,7 +7,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.constant.CommonConstant;
 import com.xuesi.xuesisi.exception.ThrowUtils;
-import com.xuesi.xuesisi.mapper.ClassMapper;
 import com.xuesi.xuesisi.model.dto.class.ClassQueryRequest;
 import com.xuesi.xuesisi.model.entity.Class;
 import com.xuesi.xuesisi.model.entity.ClassFavour;

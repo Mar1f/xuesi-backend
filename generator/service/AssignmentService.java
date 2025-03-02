@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.dto.assignment.AssignmentQueryRequest;
-import com.xuesi.xuesisi.model.entity.Assignment;
-import com.xuesi.xuesisi.model.vo.AssignmentVO;
 
 import javax.servlet.http.HttpServletRequest;
 

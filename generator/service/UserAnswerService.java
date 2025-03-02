@@ -3,8 +3,6 @@ package com.xuesi.xuesisi.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.xuesi.xuesisi.model.entity.UserAnswer;
-import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 
 import javax.servlet.http.HttpServletRequest;
 

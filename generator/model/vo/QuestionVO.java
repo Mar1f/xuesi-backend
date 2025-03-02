@@ -1,7 +1,6 @@
 package com.xuesi.xuesisi.model.vo;
 
 import cn.hutool.json.JSONUtil;
-import com.xuesi.xuesisi.model.entity.Question;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 

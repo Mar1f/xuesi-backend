@@ -4,6 +4,7 @@ import static com.xuesi.xuesisi.constant.UserConstant.USER_LOGIN_STATE;
 
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.constant.CommonConstant;
@@ -31,6 +32,52 @@ import org.springframework.util.DigestUtils;
 @Service
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Override
+    public User createStudent(User user) {
+        // 强制设置角色为 "student"
+        user.setUserRole("student");
+        save(user);
+        return user;
+    }
+
+    @Override
+    public User getStudentById(Long id) {
+        QueryWrapper<User> query = new QueryWrapper<>();
+        query.eq("id", id).eq("user_role", "student");
+        return getOne(query);
+    }
+
+    @Override
+    public List<User> getAllStudents() {
+        QueryWrapper<User> query = new QueryWrapper<>();
+        query.eq("user_role", "student");
+        return list(query);
+    }
+
+    @Override
+    public User updateStudent(Long id, User user) {
+        // 确保更新时角色依然为 "student"
+        user.setId(id);
+        user.setUserRole("student");
+        if (updateById(user)) {
+            return getStudentById(id);
+        }
+        return null;
+    }
+
+    @Override
+    public void deleteStudent(Long id) {
+        removeById(id);
+    }
+
+    @Override
+    public Page<User> getStudentsPage(int pageNumber, int pageSize) {
+        QueryWrapper<User> query = new QueryWrapper<>();
+        query.eq("user_role", "student");
+        Page<User> page = new Page<>(pageNumber, pageSize);
+        return page(page, query);
+    }
 
     /**
      * 盐值，混淆密码

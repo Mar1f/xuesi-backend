@@ -1,6 +1,7 @@
 package com.xuesi.xuesisi.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.dto.user.UserQueryRequest;
 import com.xuesi.xuesisi.model.entity.User;
@@ -106,4 +107,11 @@ public interface UserService extends IService<User> {
      */
     QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
+    // 学生相关接口：这些方法内部均要求 userRole 为 "student"
+    User createStudent(User user);
+    User getStudentById(Long id);
+    List<User> getAllStudents();
+    User updateStudent(Long id, User user);
+    void deleteStudent(Long id);
+    Page<User> getStudentsPage(int pageNumber, int pageSize);
 }

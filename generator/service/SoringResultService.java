@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.dto.soringResult.SoringResultQueryRequest;
 import com.xuesi.xuesisi.model.entity.SoringResult;
-import com.xuesi.xuesisi.model.vo.SoringResultVO;
 
 import javax.servlet.http.HttpServletRequest;
 
