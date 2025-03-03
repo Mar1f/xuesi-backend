@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+
 /**
  * @description；
  * @author:mar1
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/learningAnalysis")
 public class LearningAnalysisController {
 
-    @Autowired
+    @Resource
     private LearningAnalysisService learningAnalysisService;
 
     // 创建学情分析记录

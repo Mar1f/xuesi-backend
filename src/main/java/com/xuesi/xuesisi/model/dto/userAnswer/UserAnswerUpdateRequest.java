@@ -6,26 +6,26 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * 创建学生答案请求
+ * 更新用户答案请求
  *
  */
 @Data
-public class UserAnswerAddRequest implements Serializable {
+public class UserAnswerUpdateRequest implements Serializable {
 
     /**
-     * 标题
+     * id
      */
-    private String title;
+    private Long id;
 
     /**
-     * 内容
+     * 应用 id
      */
-    private String content;
+    private Long appId;
 
     /**
-     * 标签列表
+     * 用户答案（JSON 数组）
      */
-    private List<String> tags;
+    private List<String> choices;
 
     private static final long serialVersionUID = 1L;
 }
