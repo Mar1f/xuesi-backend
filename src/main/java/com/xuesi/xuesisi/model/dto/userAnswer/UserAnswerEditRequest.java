@@ -21,9 +21,9 @@ public class UserAnswerEditRequest implements Serializable {
 
 
     /**
-     * 应用 id
+     * 题单id
      */
-    private Long appId;
+    private Long questionBankId;
 
     /**
      * 用户答案（JSON 数组）

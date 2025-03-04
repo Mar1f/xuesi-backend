@@ -43,7 +43,7 @@ public class ScoringResultAddRequest implements Serializable {
     /**
      * 应用 id
      */
-    private Long appId;
+    private Long questionBankId;
 
     private static final long serialVersionUID = 1L;
 }

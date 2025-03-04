@@ -31,7 +31,7 @@ public class QuestionVO implements Serializable {
     /**
      * 应用 id
      */
-    private Long appId;
+    private Long questionBankId;
 
     /**
      * 创建用户 id

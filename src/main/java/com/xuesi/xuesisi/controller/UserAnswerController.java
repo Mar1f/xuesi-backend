@@ -74,7 +74,10 @@ public class UserAnswerController {
         // 数据校验
         userAnswerService.validUserAnswer(userAnswer, true);
         // 判断  是否存在
-        Long questionBankId = userAnswerAddRequest.getAppId();
+        log.info("收到的请求: {}", userAnswerAddRequest);
+        log.info("解析出的 questionBankId: {}", userAnswerAddRequest.getQuestionBankId());
+
+        Long questionBankId = userAnswerAddRequest.getQuestionBankId();
         QuestionBank questionBank = questionBankService.getById(questionBankId);
         ThrowUtils.throwIf(questionBank == null, ErrorCode.NOT_FOUND_ERROR);
         if (!ReviewStatusEnum.PASS.equals(ReviewStatusEnum.getEnumByValue(questionBank.getReviewStatus()))) {
@@ -82,7 +85,7 @@ public class UserAnswerController {
         }
         // 填充默认值
         User loginUser = userService.getLoginUser(request);
-        userAnswer.setUserId(loginUser.getId());
+        userAnswer.setUserAnswerId(loginUser.getId());
         // 写入数据库
         boolean result = userAnswerService.save(userAnswer);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -118,7 +121,7 @@ public class UserAnswerController {
         UserAnswer oldUserAnswer = userAnswerService.getById(id);
         ThrowUtils.throwIf(oldUserAnswer == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可删除
-        if (!oldUserAnswer.getUserId().equals(user.getId()) && !userService.isAdmin(request)) {
+        if (!oldUserAnswer.getUserAnswerId().equals(user.getId()) && !userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 操作数据库
@@ -260,7 +263,7 @@ public class UserAnswerController {
         UserAnswer oldUserAnswer = userAnswerService.getById(id);
         ThrowUtils.throwIf(oldUserAnswer == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可编辑
-        if (!oldUserAnswer.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+        if (!oldUserAnswer.getUserAnswerId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 操作数据库

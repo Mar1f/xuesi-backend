@@ -78,11 +78,11 @@ public class UserAnswerVO implements Serializable {
      * @param userAnswer
      * @return
      */
-    public static UserAnswerVO objToVo(UserAnswer userAnswer) {
+    public static UserIdVO objToVo(UserId userAnswer) {
         if (userAnswer == null) {
             return null;
         }
-        UserAnswerVO userAnswerVO = new UserAnswerVO();
+        UserIdVO userAnswerVO = new UserIdVO();
         BeanUtils.copyProperties(userAnswer, userAnswerVO);
         userAnswerVO.setTagList(JSONUtil.toList(userAnswer.getTags(), String.class));
         return userAnswerVO;

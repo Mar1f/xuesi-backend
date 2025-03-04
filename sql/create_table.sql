@@ -124,10 +124,10 @@ CREATE TABLE IF NOT EXISTS `scoring_result` (
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `user_answer` (
     `id`               BIGINT AUTO_INCREMENT PRIMARY KEY,
-     `questionbankId`   BIGINT NOT NULL COMMENT '题单ID',
-      `questionbankType` TINYINT  NOT NULL DEFAULT 0 COMMENT '题单类型',
-       `scoringStrategy`  TINYINT  NOT NULL DEFAULT 0 COMMENT '评分策略',
-     `choices`          TEXT NULL COMMENT '用户答案JSON',
+    `questionbankId`   BIGINT NOT NULL COMMENT '题单ID',
+    `questionbankType` TINYINT  NOT NULL DEFAULT 0 COMMENT '题单类型',
+    `scoringStrategy`  TINYINT  NOT NULL DEFAULT 0 COMMENT '评分策略',
+    `choices`          TEXT NULL COMMENT '用户答案JSON',
     `resultId`         BIGINT NULL COMMENT '评分结果ID',
     `resultName`       VARCHAR(128) NULL,
     `resultDesc`       TEXT NULL,
@@ -146,13 +146,13 @@ CREATE TABLE IF NOT EXISTS `user_answer` (
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `user_answer_detail` (
    `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `userAnswerId`  BIGINT NOT NULL COMMENT '关联user_answer.id',
+    `userId`  BIGINT NOT NULL COMMENT '关联user_answer.id',
     `questionId`    BIGINT NOT NULL COMMENT '题目ID',
     `userChoice`    TEXT COMMENT '用户答案',
      `isCorrect`     TINYINT COMMENT '是否正确: 0-否, 1-是',
     `score`         INT COMMENT '本题得分',
     `createTime`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_userAnswerId` (`userAnswerId`)
+    INDEX `idx_userId` (`userId`)
     ) COMMENT '用户答题详情表' COLLATE = utf8mb4_unicode_ci;
 
 -- ----------------------------

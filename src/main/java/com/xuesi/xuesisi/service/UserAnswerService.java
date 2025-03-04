@@ -2,14 +2,18 @@ package com.xuesi.xuesisi.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerQueryRequest;
+import com.xuesi.xuesisi.model.entity.UserAnswer;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * 学生答案服务
- *
- */
+* @author mar1
+* @description 针对表【user_answer(用户答题记录表)】的数据库操作Service
+* @createDate 2025-03-02 15:47:32
+*/
 public interface UserAnswerService extends IService<UserAnswer> {
 
     /**
@@ -29,7 +33,7 @@ public interface UserAnswerService extends IService<UserAnswer> {
     QueryWrapper<UserAnswer> getQueryWrapper(UserAnswerQueryRequest userAnswerQueryRequest);
 
     /**
-     * 获取学生答案封装
+     * 获取用户答案封装
      *
      * @param userAnswer
      * @param request
@@ -38,7 +42,7 @@ public interface UserAnswerService extends IService<UserAnswer> {
     UserAnswerVO getUserAnswerVO(UserAnswer userAnswer, HttpServletRequest request);
 
     /**
-     * 分页获取学生答案封装
+     * 分页获取用户答案封装
      *
      * @param userAnswerPage
      * @param request
@@ -46,3 +50,4 @@ public interface UserAnswerService extends IService<UserAnswer> {
      */
     Page<UserAnswerVO> getUserAnswerVOPage(Page<UserAnswer> userAnswerPage, HttpServletRequest request);
 }
+

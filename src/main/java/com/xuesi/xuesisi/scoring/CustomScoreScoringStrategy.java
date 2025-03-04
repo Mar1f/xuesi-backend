@@ -72,13 +72,13 @@ public class CustomScoreScoringStrategy implements ScoringStrategy {
 
         // 4. 构造返回值，填充答案对象的属性
         UserAnswer userAnswer = new UserAnswer();
-        userAnswer.setQuestionbankId(questionBankId);
-        userAnswer.setQuestionbankType(questionBank.getQuestionBankType());
+        userAnswer.setQuestionBankId(questionBankId);
+        userAnswer.setQuestionBankType(questionBank.getQuestionBankType());
         userAnswer.setScoringStrategy(questionBank.getScoringStrategy());
         userAnswer.setChoices(JSONUtil.toJsonStr(choices));
         userAnswer.setResultId(maxScoringResult.getId());
         userAnswer.setResultName(maxScoringResult.getResultName());
-        userAnswer.setResultDesc(maxScoringResult.getResultDesc());
+//        userAnswer.setResultDesc(maxScoringResult.getResultDesc());
 //        userAnswer.setResultPicture(maxScoringResult.getResultPicture());
         userAnswer.setResultScore(totalScore);
         return userAnswer;

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xuesi.xuesisi.mapper.UserAnswerMapper">
+
+    <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.UserAnswer">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="questionBankId" column="questionbankId" jdbcType="BIGINT"/>
+            <result property="questionBankType" column="questionbankType" jdbcType="TINYINT"/>
+            <result property="scoringStrategy" column="scoringStrategy" jdbcType="TINYINT"/>
+            <result property="choices" column="choices" jdbcType="VARCHAR"/>
+            <result property="resultId" column="resultId" jdbcType="BIGINT"/>
+            <result property="resultName" column="resultName" jdbcType="VARCHAR"/>
+            <result property="resultScore" column="resultScore" jdbcType="INTEGER"/>
+            <result property="userAnswerId" column="userId" jdbcType="BIGINT"/>
+            <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,questionbankId,questionbankType,
+        scoringStrategy,choices,resultId,
+        resultName,
+        resultScore,userId,createTime,
+        updateTime,isDelete
+    </sql>
+</mapper>
