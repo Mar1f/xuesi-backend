@@ -2,22 +2,29 @@ package com.xuesi.xuesisi.scoring;
 
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xuesi.xuesisi.common.ErrorCode;
+import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.dto.question.QuestionContentDTO;
+import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerAddRequest;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
 import com.xuesi.xuesisi.model.entity.Question;
+import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
 import com.xuesi.xuesisi.model.entity.ScoringResult;
 import com.xuesi.xuesisi.model.entity.UserAnswer;
 import com.xuesi.xuesisi.model.vo.QuestionVO;
+import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.QuestionService;
 import com.xuesi.xuesisi.service.ScoringResultService;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * 自定义打分类应用评分策略
- *
+ * 得分类题目评分策略
  */
 @ScoringStrategyConfig(appType = 0, scoringStrategy = 0)
 public class CustomScoreScoringStrategy implements ScoringStrategy {
@@ -28,59 +35,111 @@ public class CustomScoreScoringStrategy implements ScoringStrategy {
     @Resource
     private ScoringResultService scoringResultService;
 
+    @Resource
+    private QuestionBankQuestionService questionBankQuestionService;
+
     @Override
     public UserAnswer doScore(List<String> choices, QuestionBank questionBank) throws Exception {
+        if (questionBank == null || questionBank.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "题库信息不能为空");
+        }
+        
         Long questionBankId = questionBank.getId();
-        // 1. 根据 id 查询到题目和题目结果信息（按分数降序排序）
-        Question question = questionService.getOne(
-                Wrappers.lambdaQuery(Question.class).eq(Question::getQuestionContent, questionBankId)
+        
+        // 1. 获取题库中的所有题目
+        List<QuestionBankQuestion> questionBankQuestions = questionBankQuestionService.list(
+            Wrappers.lambdaQuery(QuestionBankQuestion.class)
+                .eq(QuestionBankQuestion::getQuestionBankId, questionBankId)
         );
-        List<ScoringResult> scoringResultList = scoringResultService.list(
-                Wrappers.lambdaQuery(ScoringResult.class)
-                        .eq(ScoringResult::getQuestionbankId, questionBankId)
-                        .orderByDesc(ScoringResult::getResultScoreRange)
-        );
-
-        // 2. 统计用户的总得分
-        int totalScore = 0;
-        QuestionVO questionVO = QuestionVO.objToVo(question);
-        List<QuestionContentDTO> questionContent = questionVO.getQuestionContent();
-
-        // 遍历题目列表
-        for (QuestionContentDTO questionContentDTO : questionContent) {
-            // 遍历答案列表
-            for (String answer : choices) {
-                // 遍历题目中的选项
-                for (QuestionContentDTO.Option option : questionContentDTO.getOptions()) {
-                    // 如果答案和选项的key匹配
-                    if (option.getKey().equals(answer)) {
-                        int score = Optional.of(option.getScore()).orElse(0);
-                        totalScore += score;
-                    }
-                }
-            }
+        
+        if (questionBankQuestions.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "题库中没有题目，请先添加题目");
+        }
+        
+        // 获取所有题目ID
+        List<Long> questionIds = questionBankQuestions.stream()
+            .map(QuestionBankQuestion::getQuestionId)
+            .collect(Collectors.toList());
+            
+        // 获取题目详情
+        List<Question> questions = questionService.listByIds(questionIds);
+        if (questions.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "题目信息不存在，请检查题目数据");
         }
 
-        // 3. 遍历得分结果，找到第一个用户分数大于得分范围的结果，作为最终结果
-        ScoringResult maxScoringResult = scoringResultList.get(0);
+        // 2. 计算用户的总得分
+        int totalScore = 0;
+        int questionIndex = 0;
+        
+        // 遍历题目进行评分
+        for (Question question : questions) {
+            if (questionIndex >= choices.size()) {
+                break; // 如果用户答案数量少于题目数量，只计算已答题目
+            }
+            
+            String userAnswer = choices.get(questionIndex);
+            List<String> correctAnswers = question.getAnswer();
+            
+            // 根据题目类型进行不同的答案比较
+            if (question.getQuestionType() == 0) { // 单选题
+                if (correctAnswers != null && !correctAnswers.isEmpty() && 
+                    userAnswer != null && correctAnswers.get(0).equals(userAnswer)) {
+                    totalScore += question.getScore() != null ? question.getScore() : 10;
+                }
+            } else if (question.getQuestionType() == 1) { // 多选题
+                // 将用户答案拆分为列表（例如："ABC" -> ["A", "B", "C"]）
+                List<String> userAnswers = userAnswer != null ? 
+                    userAnswer.chars()
+                        .mapToObj(ch -> String.valueOf((char) ch))
+                        .collect(Collectors.toList()) : 
+                    new ArrayList<>();
+                
+                // 检查用户答案是否完全匹配正确答案
+                if (correctAnswers != null && 
+                    new HashSet<>(correctAnswers).equals(new HashSet<>(userAnswers))) {
+                    totalScore += question.getScore() != null ? question.getScore() : 10;
+                }
+            }
+            
+            questionIndex++;
+        }
+
+        // 3. 获取评分结果（按分数降序排序）
+        List<ScoringResult> scoringResultList = scoringResultService.list(
+            Wrappers.lambdaQuery(ScoringResult.class)
+                .eq(ScoringResult::getQuestionBankId, questionBankId)
+                .orderByDesc(ScoringResult::getResultScoreRange)
+        );
+        
+        if (scoringResultList.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "评分结果不存在，请先配置评分结果");
+        }
+
+        // 4. 根据得分范围确定最终结果
+        ScoringResult finalResult = null;
         for (ScoringResult scoringResult : scoringResultList) {
             if (totalScore >= scoringResult.getResultScoreRange()) {
-                maxScoringResult = scoringResult;
+                finalResult = scoringResult;
                 break;
             }
         }
+        
+        // 如果没有找到匹配的结果，使用最低档的结果
+        if (finalResult == null && !scoringResultList.isEmpty()) {
+            finalResult = scoringResultList.get(scoringResultList.size() - 1);
+        }
 
-        // 4. 构造返回值，填充答案对象的属性
+        // 5. 构造返回值，填充答案对象的属性
         UserAnswer userAnswer = new UserAnswer();
         userAnswer.setQuestionBankId(questionBankId);
-        userAnswer.setQuestionBankType(questionBank.getQuestionBankType());
-        userAnswer.setScoringStrategy(questionBank.getScoringStrategy());
-        userAnswer.setChoices(JSONUtil.toJsonStr(choices));
-        userAnswer.setResultId(maxScoringResult.getId());
-        userAnswer.setResultName(maxScoringResult.getResultName());
-//        userAnswer.setResultDesc(maxScoringResult.getResultDesc());
-//        userAnswer.setResultPicture(maxScoringResult.getResultPicture());
+        userAnswer.setQuestionBankType(0); // 固定为得分类型
+        userAnswer.setScoringStrategy(0); // 固定为自定义评分策略
+        userAnswer.setChoices(JSONUtil.toJsonStr(choices)); // 将答案列表转换为JSON字符串
+        userAnswer.setResultId(finalResult.getId());
+        userAnswer.setResultName(finalResult.getResultName());
         userAnswer.setResultScore(totalScore);
+        userAnswer.setResultDesc(finalResult.getResultDesc()); // 添加评分描述
+        
         return userAnswer;
     }
 }

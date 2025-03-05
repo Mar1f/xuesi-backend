@@ -117,4 +117,29 @@ public class QuestionBankController {
         return ResultUtils.success(true);
     }
 
+    /**
+     * 为现有题库初始化评分结果
+     *
+     * @param id
+     * @param request
+     * @return
+     */
+    @PostMapping("/initScoringResults/{id}")
+    public BaseResponse<Boolean> initScoringResults(@PathVariable Long id, HttpServletRequest request) {
+        if (id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        QuestionBank questionBank = questionBankService.getById(id);
+        if (questionBank == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        // 只允许创建者或管理员初始化评分结果
+        User loginUser = userService.getLoginUser(request);
+        if (!questionBank.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        questionBankService.initScoringResults(questionBank);
+        return ResultUtils.success(true);
+    }
+
 }

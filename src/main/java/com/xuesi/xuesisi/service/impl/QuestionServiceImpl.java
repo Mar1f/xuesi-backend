@@ -2,12 +2,19 @@ package com.xuesi.xuesisi.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xuesi.xuesisi.common.ErrorCode;
+import com.xuesi.xuesisi.exception.BusinessException;
+import com.xuesi.xuesisi.model.dto.question.CreateQuestionRequest;
 import com.xuesi.xuesisi.model.entity.Question;
+import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
+import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.QuestionService;
 import com.xuesi.xuesisi.mapper.QuestionMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
 
@@ -19,6 +26,9 @@ import java.util.List;
 @Service
 @Slf4j
 public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> implements QuestionService {
+
+    @Resource
+    private QuestionBankQuestionService questionBankQuestionService;
 
     @Override
     public Question createQuestion(Question question) {
@@ -81,6 +91,47 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         // 例如：调用 deepseekClient.generateQuestions(keywords);
         // 这里直接返回一个空列表作为示例
         return Collections.emptyList(); // 返回空列表
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Question createQuestionWithBinding(CreateQuestionRequest createQuestionRequest, Long userId) {
+        if (createQuestionRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        // 1. 创建题目
+        Question question = new Question();
+        question.setQuestionContent(createQuestionRequest.getQuestionContent());
+        question.setTags(createQuestionRequest.getTags());
+        question.setQuestionType(createQuestionRequest.getQuestionType());
+        question.setOptions(createQuestionRequest.getOptions());
+        question.setAnswer(createQuestionRequest.getAnswer());
+        question.setScore(createQuestionRequest.getScore());
+        question.setSource(createQuestionRequest.getSource());
+        question.setUserId(userId);
+
+        boolean saveResult = this.save(question);
+        if (!saveResult) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "题目保存失败");
+        }
+
+        // 2. 如果有题单绑定信息，创建题目和题单的关联
+        CreateQuestionRequest.QuestionBankBinding binding = createQuestionRequest.getQuestionBankBinding();
+        if (binding != null && binding.getQuestionBankId() != null) {
+            QuestionBankQuestion questionBankQuestion = new QuestionBankQuestion();
+            questionBankQuestion.setQuestionBankId(binding.getQuestionBankId());
+            questionBankQuestion.setQuestionId(question.getId());
+            questionBankQuestion.setQuestionOrder(binding.getQuestionOrder());
+            questionBankQuestion.setUserId(userId);
+
+            boolean bindResult = questionBankQuestionService.save(questionBankQuestion);
+            if (!bindResult) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "题目绑定题单失败");
+            }
+        }
+
+        return question;
     }
 }
 

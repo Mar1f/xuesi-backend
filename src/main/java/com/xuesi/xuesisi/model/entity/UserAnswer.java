@@ -51,6 +51,10 @@ public class UserAnswer implements Serializable {
      */
     private String resultName;
 
+    /**
+     * 评分结果描述
+     */
+    private String resultDesc;
 
     /**
      * 得分

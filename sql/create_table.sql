@@ -73,9 +73,9 @@ CREATE TABLE IF NOT EXISTS `question_bank` (
 -- 题目表
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `question` (
-     `id`               BIGINT AUTO_INCREMENT COMMENT '题目ID' PRIMARY KEY,
-     `questionContent`  TEXT           NOT NULL COMMENT '题干文本',
-     `tags`             VARCHAR(1024)  NULL COMMENT '标签列表（json 数组）',
+    `id`               BIGINT AUTO_INCREMENT COMMENT '题目ID' PRIMARY KEY,
+    `questionContent`  TEXT           NOT NULL COMMENT '题干文本',
+    `tags`             VARCHAR(1024)  NULL COMMENT '标签列表（json 数组）',
     `questionType`     TINYINT        NOT NULL COMMENT '题型: 0-单选, 1-多选, 2-填空',
     `options`          TEXT           NULL COMMENT '选项（JSON数组, 如["A","B"]）',
     `answer`           VARCHAR(512)   NOT NULL COMMENT '正确答案',
@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS `scoring_result` (
 -- ----------------------------
 -- 用户答题记录表（优化索引）
 -- ----------------------------
+USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `user_answer` (
     `id`               BIGINT AUTO_INCREMENT PRIMARY KEY,
     `questionbankId`   BIGINT NOT NULL COMMENT '题单ID',
@@ -133,19 +134,19 @@ CREATE TABLE IF NOT EXISTS `user_answer` (
     `resultDesc`       TEXT NULL,
     `resultPicture`   VARCHAR(1024) NULL,
     `resultScore`      INT NULL COMMENT '得分',
-    `userId`           BIGINT NOT NULL COMMENT '学生ID',
+    `userAnswerId`           BIGINT NOT NULL COMMENT '学生ID',
     `createTime`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `isDelete`         TINYINT NOT NULL DEFAULT 0,
     INDEX `idx_questionbankId` (`questionbankId`),
-    INDEX `idx_userId` (`userId`)
+    INDEX `idx_userId` (`userAnswerId`)
     ) COMMENT '用户答题记录表' COLLATE = utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- 用户答题详情表（新增表）
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `user_answer_detail` (
-   `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
     `userId`  BIGINT NOT NULL COMMENT '关联user_answer.id',
     `questionId`    BIGINT NOT NULL COMMENT '题目ID',
     `userChoice`    TEXT COMMENT '用户答案',

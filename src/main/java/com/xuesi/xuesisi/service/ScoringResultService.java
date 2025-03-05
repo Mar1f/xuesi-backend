@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.dto.scoringResult.ScoringResultQueryRequest;
 import com.xuesi.xuesisi.model.entity.ScoringResult;
 import com.xuesi.xuesisi.model.vo.ScoringResultVO;
+import com.xuesi.xuesisi.model.entity.QuestionBank;
 
 import javax.servlet.http.HttpServletRequest;
 /**
@@ -54,5 +55,12 @@ public interface ScoringResultService extends IService<ScoringResult> {
      * @return
      */
     Page<ScoringResultVO> getScoringResultVOPage(Page<ScoringResult> scoringResultPage, HttpServletRequest request);
+
+    /**
+     * 创建默认评分结果
+     *
+     * @param questionBank 题库信息
+     */
+    void createDefaultScoringResults(QuestionBank questionBank);
 }
 

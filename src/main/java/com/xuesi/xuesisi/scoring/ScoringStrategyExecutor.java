@@ -15,34 +15,42 @@ import java.util.List;
 @Service
 public class ScoringStrategyExecutor {
 
-    // 策略列表
     @Resource
-    private List<ScoringStrategy> scoringStrategyList;
-
+    private CustomScoreScoringStrategy customScoreScoringStrategy;
+    
+    @Resource
+    private AIScoringStrategy aiScoringStrategy;
 
     /**
      * 评分
      *
-     * @param choiceList
-     * @param questionBank
-     * @return
+     * @param choiceList 用户选择的答案列表
+     * @param questionBank 题库信息
+     * @return 评分结果
      * @throws Exception
      */
     public UserAnswer doScore(List<String> choiceList, QuestionBank questionBank) throws Exception {
-        Integer questionBankType = questionBank.getQuestionBankType();
-        Integer appScoringStrategy = questionBank.getScoringStrategy();
-        if (questionBankType == null || appScoringStrategy == null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用配置有误，未找到匹配的策略");
+        if (questionBank == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "题库信息不能为空");
         }
-        // 根据注解获取策略
-        for (ScoringStrategy strategy : scoringStrategyList) {
-            if (strategy.getClass().isAnnotationPresent(ScoringStrategyConfig.class)) {
-                ScoringStrategyConfig scoringStrategyConfig = strategy.getClass().getAnnotation(ScoringStrategyConfig.class);
-                if (scoringStrategyConfig.appType() == questionBankType && scoringStrategyConfig.scoringStrategy() == appScoringStrategy) {
-                    return strategy.doScore(choiceList, questionBank);
-                }
-            }
+        
+        // 根据评分策略选择不同的评分器
+        Integer scoringStrategy = questionBank.getScoringStrategy();
+        if (scoringStrategy == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "评分策略不能为空");
         }
-        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用配置有误，未找到匹配的策略");
+        
+        // 设置为得分类型
+        questionBank.setQuestionBankType(0);
+        
+        // 根据评分策略选择评分器
+        switch (scoringStrategy) {
+            case 0: // 自定义评分
+                return customScoreScoringStrategy.doScore(choiceList, questionBank);
+            case 1: // AI 评分
+                return aiScoringStrategy.doScore(choiceList, questionBank);
+            default:
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持的评分策略");
+        }
     }
 }

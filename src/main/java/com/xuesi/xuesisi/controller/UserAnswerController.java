@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 用户答案接口
@@ -64,13 +65,13 @@ public class UserAnswerController {
      * @return
      */
     @PostMapping("/add")
-    public BaseResponse<Long> addUserAnswer(@RequestBody UserAnswerAddRequest userAnswerAddRequest, HttpServletRequest request) {
+    public BaseResponse<UserAnswerVO> addUserAnswer(@RequestBody UserAnswerAddRequest userAnswerAddRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userAnswerAddRequest == null, ErrorCode.PARAMS_ERROR);
         // 在此处将实体类和 DTO 进行转换
         UserAnswer userAnswer = new UserAnswer();
         BeanUtils.copyProperties(userAnswerAddRequest, userAnswer);
-        List<String> choices = userAnswerAddRequest.getChoices();
-        userAnswer.setChoices(JSONUtil.toJsonStr(choices));
+        // 将choices对象转换为JSON字符串
+        userAnswer.setChoices(JSONUtil.toJsonStr(userAnswerAddRequest.getChoices()));
         // 数据校验
         userAnswerService.validUserAnswer(userAnswer, true);
         // 判断  是否存在
@@ -83,9 +84,16 @@ public class UserAnswerController {
         if (!ReviewStatusEnum.PASS.equals(ReviewStatusEnum.getEnumByValue(questionBank.getReviewStatus()))) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "应用未通过审核，无法答题");
         }
+        
+        // 确保评分策略已设置
+        ThrowUtils.throwIf(questionBank.getScoringStrategy() == null, ErrorCode.PARAMS_ERROR, "题库未设置评分策略");
+        
         // 填充默认值
         User loginUser = userService.getLoginUser(request);
         userAnswer.setUserAnswerId(loginUser.getId());
+        userAnswer.setScoringStrategy(questionBank.getScoringStrategy()); // 设置评分策略
+        userAnswer.setQuestionBankType(questionBank.getQuestionBankType()); // 设置题库类型
+        
         // 写入数据库
         boolean result = userAnswerService.save(userAnswer);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -93,14 +101,24 @@ public class UserAnswerController {
         long newUserAnswerId = userAnswer.getId();
         // 调用评分模块
         try {
-            UserAnswer userAnswerWithResult = scoringStrategyExecutor.doScore(choices, questionBank);
+            // 从choices中提取答案列表
+            List<String> answerList = userAnswerAddRequest.getChoices().stream()
+                    .map(choice -> String.join(",", choice.getAnswer()))
+                    .collect(Collectors.toList());
+            log.info("开始评分，答案列表: {}", answerList);
+            UserAnswer userAnswerWithResult = scoringStrategyExecutor.doScore(answerList, questionBank);
+            log.info("评分完成，结果: {}", userAnswerWithResult);
             userAnswerWithResult.setId(newUserAnswerId);
             userAnswerService.updateById(userAnswerWithResult);
+            
+            // 获取完整的评分结果并返回
+            UserAnswer updatedAnswer = userAnswerService.getById(newUserAnswerId);
+            UserAnswerVO userAnswerVO = userAnswerService.getUserAnswerVO(updatedAnswer, request);
+            return ResultUtils.success(userAnswerVO);
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "评分错误");
+            log.error("评分出错", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "评分错误: " + e.getMessage());
         }
-        return ResultUtils.success(newUserAnswerId);
     }
 
     /**

@@ -44,7 +44,7 @@ public class ScoringResult implements Serializable {
     /**
      * 关联题单ID
      */
-    private Long questionbankId;
+    private Long questionBankId;
 
     /**
      * 创建人ID

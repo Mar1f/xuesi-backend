@@ -7,10 +7,10 @@
     <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.Question">
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="questionContent" column="questionContent" jdbcType="VARCHAR"/>
-            <result property="tags" column="tags" jdbcType="VARCHAR"/>
+            <result property="tagsStr" column="tags" jdbcType="VARCHAR"/>
             <result property="questionType" column="questionType" jdbcType="TINYINT"/>
-            <result property="options" column="options" jdbcType="VARCHAR"/>
-            <result property="answer" column="answer" jdbcType="VARCHAR"/>
+            <result property="optionsStr" column="options" jdbcType="VARCHAR"/>
+            <result property="answerStr" column="answer" jdbcType="VARCHAR"/>
             <result property="score" column="score" jdbcType="INTEGER"/>
             <result property="source" column="source" jdbcType="TINYINT"/>
             <result property="userId" column="userId" jdbcType="BIGINT"/>
@@ -25,4 +25,16 @@
         score,source,userId,
         createTime,updateTime,isDelete
     </sql>
+    
+    <insert id="insert" parameterType="com.xuesi.xuesisi.model.entity.Question" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO question (
+            questionContent, tags, questionType,
+            options, answer, score,
+            source, userId
+        ) VALUES (
+            #{questionContent}, #{tagsStr}, #{questionType},
+            #{optionsStr}, #{answerStr}, #{score},
+            #{source}, #{userId}
+        )
+    </insert>
 </mapper>
