@@ -73,6 +73,11 @@ public class Question implements Serializable {
     private Integer source;
 
     /**
+     * 题目解析
+     */
+    private String analysis;
+
+    /**
      * 创建人ID
      */
     private Long userId;

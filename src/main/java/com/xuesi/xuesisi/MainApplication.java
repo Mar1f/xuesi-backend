@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.retry.annotation.EnableRetry;
 
 /**
  * 主类（项目启动入口）
@@ -16,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("com.xuesi.xuesisi.mapper")
 @EnableScheduling
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
+@EnableRetry
 public class MainApplication {
 
     public static void main(String[] args) {

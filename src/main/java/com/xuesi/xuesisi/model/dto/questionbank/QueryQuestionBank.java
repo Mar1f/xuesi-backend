@@ -25,6 +25,10 @@ public class QueryQuestionBank {
      * 审核状态：0-待审, 1-通过, 2-拒绝
      */
     private Integer reviewStatus;
+    /**
+     * 学科
+     */
+    private String subject;
     private String reviewMessage;
     private Long reviewerId;
     private Long userId;

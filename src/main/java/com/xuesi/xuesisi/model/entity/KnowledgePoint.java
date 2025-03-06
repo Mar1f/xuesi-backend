@@ -32,22 +32,27 @@ public class KnowledgePoint implements Serializable {
     private String description;
 
     /**
+     * 学科
+     */
+    private String subject;
+
+    /**
      * 创建人ID（教师或管理员）
      */
     private Long userId;
 
     /**
-     * 
+     * 创建时间
      */
     private Date createTime;
 
     /**
-     * 
+     * 更新时间
      */
     private Date updateTime;
 
     /**
-     * 
+     * 是否删除
      */
     private Integer isDelete;
 

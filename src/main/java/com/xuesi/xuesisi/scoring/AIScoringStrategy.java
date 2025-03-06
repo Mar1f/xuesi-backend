@@ -1,8 +1,11 @@
 package com.xuesi.xuesisi.scoring;
 
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xuesi.xuesisi.common.ErrorCode;
+import com.xuesi.xuesisi.common.BaseResponse;
 import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
 import com.xuesi.xuesisi.model.entity.Question;
@@ -13,9 +16,9 @@ import com.xuesi.xuesisi.service.DeepSeekService;
 import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.QuestionService;
 import com.xuesi.xuesisi.service.ScoringResultService;
+import com.xuesi.xuesisi.service.UserAnswerService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
 import javax.annotation.Resource;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -55,6 +58,8 @@ public class AIScoringStrategy implements ScoringStrategy {
         List<QuestionBankQuestion> questionBankQuestions = questionBankQuestionService.list(
             Wrappers.lambdaQuery(QuestionBankQuestion.class)
                 .eq(QuestionBankQuestion::getQuestionBankId, questionBankId)
+                .orderByDesc(QuestionBankQuestion::getCreateTime)
+                .last("LIMIT " + questionBank.getQuestionCount())
         );
         
         if (questionBankQuestions.isEmpty()) {
@@ -104,17 +109,11 @@ public class AIScoringStrategy implements ScoringStrategy {
         log.info("收到 DeepSeek API 响应");
         
         // 4. 解析 AI 返回的分数
-        Pattern pattern = Pattern.compile("总分：(\\d+)");
-        Matcher matcher = pattern.matcher(aiResponse);
-        int totalScore = 0;
-        if (matcher.find()) {
-            totalScore = Integer.parseInt(matcher.group(1));
-            log.info("解析到总分：{}", totalScore);
-        } else {
-            log.error("无法从 AI 响应中解析出总分：{}", aiResponse);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 评分结果解析失败");
-        }
-
+        int totalScore = parseScore(aiResponse);
+        int maxPossibleScore = questions.size() * 10; // 计算最大可能分数
+        
+        log.info("AI 返回的评分结果: {}", aiResponse);
+        
         // 5. 获取评分结果（按分数降序排序）
         List<ScoringResult> scoringResultList = scoringResultService.list(
             Wrappers.lambdaQuery(ScoringResult.class)
@@ -156,5 +155,90 @@ public class AIScoringStrategy implements ScoringStrategy {
         
         log.info("AI 评分完成，得分：{}，结果：{}", totalScore, finalResult.getResultName());
         return userAnswer;
+    }
+
+    private int parseScore(String aiResponse) {
+        log.info("AI 评分结果原文: {}", aiResponse);
+        
+        try {
+            // 尝试解析 JSON 格式
+            JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
+            if (jsonResponse.containsKey("totalScore")) {
+                return jsonResponse.getInt("totalScore");
+            }
+            if (jsonResponse.containsKey("score")) {
+                return jsonResponse.getInt("score");
+            }
+            if (jsonResponse.containsKey("total")) {
+                return jsonResponse.getInt("total");
+            }
+            if (jsonResponse.containsKey("questions")) {
+                JSONArray questions = jsonResponse.getJSONArray("questions");
+                int totalScore = 0;
+                for (int i = 0; i < questions.size(); i++) {
+                    JSONObject question = questions.getJSONObject(i);
+                    if (question.containsKey("score")) {
+                        totalScore += question.getInt("score");
+                    }
+                }
+                return totalScore;
+            }
+        } catch (Exception e) {
+            log.warn("JSON 解析失败，尝试解析文本格式: {}", e.getMessage());
+        }
+
+        // 尝试解析文本格式
+        try {
+            // 匹配总分格式：总分：24/40 或 总分：24 或 得分：24分
+            Pattern[] totalScorePatterns = {
+                Pattern.compile("总分[：:](\\s*)(\\d+)/(\\d+)"),  // 匹配 总分：24/40
+                Pattern.compile("总分[：:](\\s*)(\\d+)分?"),      // 匹配 总分：24 或 总分：24分
+                Pattern.compile("得分[：:](\\s*)(\\d+)分?"),      // 匹配 得分：24 或 得分：24分
+                Pattern.compile("(\\d+)分"),                      // 匹配 24分
+                Pattern.compile("(\\d+)/(\\d+)")                  // 匹配 24/40
+            };
+
+            for (Pattern pattern : totalScorePatterns) {
+                Matcher matcher = pattern.matcher(aiResponse);
+                if (matcher.find()) {
+                    if (matcher.groupCount() >= 3) {
+                        // 格式：总分：24/40
+                        int score = Integer.parseInt(matcher.group(2));
+                        int total = Integer.parseInt(matcher.group(3));
+                        return (int) ((score * 100.0) / total);
+                    } else {
+                        // 格式：总分：24 或 得分：24分 或 24分
+                        int score = Integer.parseInt(matcher.group(matcher.groupCount()));
+                        return score;
+                    }
+                }
+            }
+
+            // 匹配单个题目分数：第1题：9/10分
+            Pattern questionScorePattern = Pattern.compile("第\\d+题[：:](\\s*)(\\d+)/(\\d+)分");
+            Matcher matcher = questionScorePattern.matcher(aiResponse);
+            int totalScore = 0;
+            int totalPossible = 0;
+            while (matcher.find()) {
+                int score = Integer.parseInt(matcher.group(2));
+                int possible = Integer.parseInt(matcher.group(3));
+                totalScore += score;
+                totalPossible += possible;
+            }
+            if (totalPossible > 0) {
+                return (int) ((totalScore * 100.0) / totalPossible);
+            }
+
+            // 如果以上都没匹配到，尝试提取文本中的数字
+            Pattern numberPattern = Pattern.compile("\\d+");
+            matcher = numberPattern.matcher(aiResponse);
+            if (matcher.find()) {
+                return Integer.parseInt(matcher.group());
+            }
+        } catch (Exception e) {
+            log.error("文本格式解析失败: {}", e.getMessage());
+        }
+
+        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "无法解析 AI 评分结果");
     }
 } 

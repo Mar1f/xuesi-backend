@@ -67,6 +67,10 @@ public class UserAnswerController {
     @PostMapping("/add")
     public BaseResponse<UserAnswerVO> addUserAnswer(@RequestBody UserAnswerAddRequest userAnswerAddRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userAnswerAddRequest == null, ErrorCode.PARAMS_ERROR);
+        // 验证choices字段
+        ThrowUtils.throwIf(userAnswerAddRequest.getChoices() == null || userAnswerAddRequest.getChoices().isEmpty(), 
+            ErrorCode.PARAMS_ERROR, "答案列表不能为空");
+            
         // 在此处将实体类和 DTO 进行转换
         UserAnswer userAnswer = new UserAnswer();
         BeanUtils.copyProperties(userAnswerAddRequest, userAnswer);

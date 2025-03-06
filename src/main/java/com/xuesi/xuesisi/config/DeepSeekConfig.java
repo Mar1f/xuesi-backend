@@ -21,6 +21,12 @@ public class DeepSeekConfig {
     @Value("${deepseek.api-url}")
     private String apiUrl;
     
+    @Value("${deepseek.connect-timeout:5000}")
+    private Integer connectTimeout;
+    
+    @Value("${deepseek.read-timeout:30000}")
+    private Integer readTimeout;
+    
     public String getApiKey() {
         return apiKey;
     }
@@ -39,5 +45,13 @@ public class DeepSeekConfig {
     
     public String getApiUrl() {
         return apiUrl;
+    }
+    
+    public Integer getConnectTimeout() {
+        return connectTimeout;
+    }
+    
+    public Integer getReadTimeout() {
+        return readTimeout;
     }
 } 

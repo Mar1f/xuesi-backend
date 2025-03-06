@@ -101,6 +101,16 @@ public class QuestionBank implements Serializable {
      */
     private Integer isDelete;
 
+    /**
+     * 题目数量
+     */
+    private Integer questionCount;
+
+    /**
+     * 学科
+     */
+    private String subject;
+
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 }

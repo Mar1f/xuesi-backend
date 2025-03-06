@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `user_class` (
 -- ----------------------------
 -- 题单表
 -- ----------------------------
+USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `question_bank` (
     `id`               BIGINT AUTO_INCREMENT COMMENT '题单ID' PRIMARY KEY,
     `title`            VARCHAR(128)  NOT NULL COMMENT '题单名称',
@@ -66,6 +67,8 @@ CREATE TABLE IF NOT EXISTS `question_bank` (
     `createTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `isDelete`         TINYINT       NOT NULL DEFAULT 0,
+    `questionCount`    INT           NOT NULL DEFAULT 0 COMMENT '题目数量',
+    `subject`         VARCHAR(64)   NULL COMMENT '学科',
     INDEX `idx_userId` (`userId`)
     ) COMMENT '题单表' COLLATE = utf8mb4_unicode_ci;
 
@@ -81,6 +84,7 @@ CREATE TABLE IF NOT EXISTS `question` (
     `answer`           VARCHAR(512)   NOT NULL COMMENT '正确答案',
     `score`            INT            NOT NULL DEFAULT 10 COMMENT '题目分值',
     `source`           TINYINT        NOT NULL DEFAULT 0 COMMENT '来源: 0-手动, 1-AI生成',
+    `analysis`         TEXT           NULL COMMENT '题目解析',
     `userId`           BIGINT         NOT NULL COMMENT '创建人ID',
     `createTime`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -154,45 +158,26 @@ CREATE TABLE IF NOT EXISTS `user_answer_detail` (
     `score`         INT COMMENT '本题得分',
     `createTime`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_userId` (`userId`)
-    ) COMMENT '用户答题详情表' COLLATE = utf8mb4_unicode_ci;
-
--- ----------------------------
--- 学习分析统计表（新增 tagStats 字段）
--- ----------------------------
-CREATE TABLE IF NOT EXISTS `learning_analysis` (
-    `userId`       BIGINT NOT NULL COMMENT '学生ID',
-    `classId`      BIGINT NOT NULL COMMENT '班级ID',
-     `totalScore`   INT COMMENT '累计总分',
-     `avgScore`     DECIMAL(5,2) COMMENT '平均分',
-    `weakTags`     TEXT COMMENT '薄弱知识点ID集合（JSON数组）',
-    `tagStats`     TEXT COMMENT '标签统计（如{"编程": {"correct": 5, "total": 10}}）',
-    `createTime`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`userId`, `classId`),
-    INDEX `idx_classId` (`classId`)
-    ) COMMENT '学习分析统计表' COLLATE = utf8mb4_unicode_ci;
+ )
+USE `xuesisi`;
+ALTER TABLE `question_bank`
+    ADD COLUMN `questionCount` INT NOT NULL DEFAULT 0 COMMENT '题目数量'
+AFTER `isDelete`;
 
 -- ----------------------------
 -- 知识点表
 -- ----------------------------
+USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `knowledge_point` (
-    `id`          BIGINT AUTO_INCREMENT COMMENT '知识点ID' PRIMARY KEY,
-     `name`        VARCHAR(128) NOT NULL COMMENT '知识点名称',
-    `description` TEXT NULL COMMENT '知识点描述',
-    `userId`      BIGINT NOT NULL COMMENT '创建人ID（教师或管理员）',
-    `createTime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updateTime`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `isDelete`    TINYINT NOT NULL DEFAULT 0,
-    UNIQUE KEY `uniq_name` (`name`)
+    `id`               BIGINT AUTO_INCREMENT COMMENT '知识点ID' PRIMARY KEY,
+    `name`             VARCHAR(128)  NOT NULL COMMENT '知识点名称',
+    `description`      TEXT          NULL COMMENT '知识点描述',
+    `subject`          VARCHAR(64)   NOT NULL COMMENT '学科',
+    `userId`           BIGINT        NOT NULL COMMENT '创建人ID',
+    `createTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updateTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `isDelete`         TINYINT       NOT NULL DEFAULT 0,
+    INDEX `idx_userId` (`userId`),
+    INDEX `idx_subject` (`subject`)
     ) COMMENT '知识点表' COLLATE = utf8mb4_unicode_ci;
 
--- ----------------------------
--- 题目-知识点关系表
--- ----------------------------
-CREATE TABLE IF NOT EXISTS `question_knowledge` (
-    `id`             BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
-   `questionId`     BIGINT NOT NULL COMMENT '题目ID',
-   `knowledgeId`    BIGINT NOT NULL COMMENT '知识点ID',
-    `createTime`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY `uniq_question_knowledge` (`questionId`, `knowledgeId`),
-    INDEX `idx_knowledgeId` (`knowledgeId`)
-    ) COMMENT '题目-知识点关系表' COLLATE = utf8mb4_unicode_ci;

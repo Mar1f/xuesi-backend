@@ -61,15 +61,16 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
         ThrowUtils.throwIf(userAnswer == null, ErrorCode.PARAMS_ERROR);
         // 从对象中取值
         Long questionBankId = userAnswer.getQuestionBankId();
+        String choices = userAnswer.getChoices();
         log.info("验证前的 questionBankId: {}", questionBankId);
 
         // 创建数据时，参数不能为空
         log.info("Received questionBankId: {}", userAnswer.getQuestionBankId());
-//        log.info("Checking questionBankId: {}, Found: {}", questionBankId, questionBank != null);
         if (add) {
             log.info("Received questionBankId: {}", userAnswer.getQuestionBankId());
             // 补充校验规则
             ThrowUtils.throwIf(questionBankId == null || questionBankId <= 0, ErrorCode.PARAMS_ERROR, "questionBankId 非法");
+            ThrowUtils.throwIf(StringUtils.isBlank(choices), ErrorCode.PARAMS_ERROR, "答案列表不能为空");
         }
         // 修改数据时，有参数则校验
         if (questionBankId != null) {

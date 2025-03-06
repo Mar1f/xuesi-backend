@@ -22,6 +22,24 @@ spring:
     url: jdbc:mysql://localhost:3306/xuesisi
     username: root
     password: 123456
+    # HikariCP 连接池配置
+    hikari:
+      # 连接池最大连接数
+      maximum-pool-size: 10
+      # 最小空闲连接数
+      minimum-idle: 5
+      # 空闲连接超时时间
+      idle-timeout: 300000
+      # 连接超时时间
+      connection-timeout: 20000
+      # 连接最大存活时间
+      max-lifetime: 1200000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+      # 验证连接的频率
+      validation-interval: 30000
+      # 是否自动提交
+      auto-commit: true
   # Redis 配置
   # todo 需替换配置，然后取消注释
 #  redis:
@@ -76,7 +94,9 @@ knife4j:
 # DeepSeek 配置
 deepseek:
   api-key: sk-mhvldecltnlzzjiamchmcvnducfkangmlmkpkjsxwoefdsmm # 从环境变量中获取
-  model:  deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+  model: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B # 使用 DeepSeek-R1-Distill-Qwen-7B 模型 :
   max-tokens: 4000 # 增加 token 限制以获取更详细的分析
-  temperature: 0.3 # 降低温度以获得更确定性的答案
-  api-url: https://api.cloud.siliconflow.cn/v1/chat/completions # 正确的 API 端点
+  temperature: 0.7 # 更新为官方推荐的温度值
+  api-url: https://api.siliconflow.cn/v1/chat/completions # 更新为正确的 API 端点
+  connect-timeout: 10000 # 连接超时时间（毫秒）
+  read-timeout: 60000 # 读取超时时间（毫秒）

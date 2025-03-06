@@ -39,5 +39,13 @@ public class CreateQuestionBank {
          * 创建人ID
          */
         private Long userId;
+        /**
+         * 题目数量
+         */
+        private Integer questionCount;
+        /**
+         * 学科
+         */
+        private String subject;
     }
 }

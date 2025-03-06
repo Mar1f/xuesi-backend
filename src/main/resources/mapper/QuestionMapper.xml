@@ -13,6 +13,7 @@
             <result property="answerStr" column="answer" jdbcType="VARCHAR"/>
             <result property="score" column="score" jdbcType="INTEGER"/>
             <result property="source" column="source" jdbcType="TINYINT"/>
+            <result property="analysis" column="analysis" jdbcType="VARCHAR"/>
             <result property="userId" column="userId" jdbcType="BIGINT"/>
             <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
@@ -22,19 +23,19 @@
     <sql id="Base_Column_List">
         id,questionContent,tags,
         questionType,options,answer,
-        score,source,userId,
-        createTime,updateTime,isDelete
+        score,source,analysis,
+        userId,createTime,updateTime,isDelete
     </sql>
     
     <insert id="insert" parameterType="com.xuesi.xuesisi.model.entity.Question" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO question (
             questionContent, tags, questionType,
             options, answer, score,
-            source, userId
+            source, analysis, userId
         ) VALUES (
             #{questionContent}, #{tagsStr}, #{questionType},
             #{optionsStr}, #{answerStr}, #{score},
-            #{source}, #{userId}
+            #{source}, #{analysis}, #{userId}
         )
     </insert>
 </mapper>

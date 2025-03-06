@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.constant.CommonConstant;
 import com.xuesi.xuesisi.exception.ThrowUtils;
+import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.mapper.ScoringResultMapper;
 import com.xuesi.xuesisi.model.dto.scoringResult.ScoringResultQueryRequest;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
@@ -25,6 +26,8 @@ import org.springframework.stereotype.Service;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -214,41 +217,124 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         try {
             // 构建AI提示词
             StringBuilder prompt = new StringBuilder();
-            prompt.append("请根据以下题目内容，生成4个评分等级及其描述。每个等级需要包含：\n");
-            prompt.append("1. 等级名称（如：优秀、良好、及格、不及格）\n");
-            prompt.append("2. 分数范围（如：90分以上、80-89分、60-79分、60分以下）\n");
-            prompt.append("3. 详细描述（包含对该等级表现的详细说明）\n\n");
+            prompt.append("请根据以下题目内容，生成5个评分等级及其描述。\n\n");
+            prompt.append("要求：\n");
+            prompt.append("1. 必须严格按照指定的JSON格式返回\n");
+            prompt.append("2. 所有字符串必须使用双引号包裹\n");
+            prompt.append("3. 分数范围必须是数字（如：90、80、70、60、0）\n");
+            prompt.append("4. 不要包含任何注释或额外说明\n\n");
             prompt.append("题目内容：\n");
             prompt.append(questionBank.getDescription());
-            prompt.append("\n\n请以JSON格式返回，格式如下：\n");
+            prompt.append("\n\n返回格式示例：\n");
             prompt.append("{\n");
             prompt.append("  \"results\": [\n");
             prompt.append("    {\n");
-            prompt.append("      \"name\": \"等级名称\",\n");
-            prompt.append("      \"scoreRange\": 分数范围,\n");
-            prompt.append("      \"description\": \"详细描述\"\n");
+            prompt.append("      \"name\": \"优秀\",\n");
+            prompt.append("      \"scoreRange\": 90,\n");
+            prompt.append("      \"description\": \"表现优秀，继续保持！\"\n");
+            prompt.append("    },\n");
+            prompt.append("    {\n");
+            prompt.append("      \"name\": \"良好\",\n");
+            prompt.append("      \"scoreRange\": 80,\n");
+            prompt.append("      \"description\": \"表现不错，仍有提升空间。\"\n");
             prompt.append("    }\n");
             prompt.append("  ]\n");
-            prompt.append("}");
+            prompt.append("}\n\n");
+            prompt.append("请严格按照上述格式返回，确保JSON格式正确且完整。");
 
             // 调用DeepSeek生成评分结果
             String aiResponse = deepSeekService.chat(prompt.toString());
+            log.info("AI生成的评分结果响应: {}", aiResponse);
             
-            // 解析AI响应
-            JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
+            // 尝试解析AI响应
+            JSONObject jsonResponse;
+            try {
+                // 处理可能的 Markdown 代码块
+                String jsonStr = aiResponse;
+                
+                // 移除 Markdown 代码块标记
+                if (jsonStr.contains("```json")) {
+                    jsonStr = jsonStr.substring(jsonStr.indexOf("```json") + 7);
+                    if (jsonStr.contains("```")) {
+                        jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf("```"));
+                    }
+                }
+                jsonStr = jsonStr.trim();
+                
+                // 预处理 JSON 字符串
+                jsonStr = jsonStr.replaceAll("\\\\n\\s*", "") // 移除转义的换行符及其后的空白
+                               .replaceAll("\\s*\\\\\"\\s*", "\"") // 处理转义的引号
+                               .replaceAll("\\\\([^\"\\\\])", "$1") // 移除不必要的反斜杠
+                               .replaceAll("\"\\s*:\\s*\"", "\": \"") // 规范化键值对格式
+                               .replaceAll(",\\s*}", "}") // 处理对象末尾多余的逗号
+                               .replaceAll(",\\s*]", "]"); // 处理数组末尾多余的逗号
+                
+                // 处理特殊字符和转义序列
+                jsonStr = jsonStr.replace("\\\"", "\"")
+                               .replace("\\n", "")
+                               .replace("\\r", "")
+                               .replace("\\t", "");
+                
+                log.info("预处理后的JSON字符串: {}", jsonStr);
+                
+                // 尝试解析JSON
+                try {
+                    jsonResponse = JSONUtil.parseObj(jsonStr);
+                } catch (Exception e) {
+                    log.error("JSON解析失败，尝试修复格式: {}", e.getMessage());
+                    // 如果解析失败，尝试进一步清理和修复JSON格式
+                    jsonStr = jsonStr.replaceAll("\\s+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", "") // 移除引号外的空白
+                                   .replaceAll("(?<![\"{\\[,])\\s+(?![\"\\]}])", ""); // 保留必要的空格
+                    log.info("修复后的JSON字符串: {}", jsonStr);
+                    jsonResponse = JSONUtil.parseObj(jsonStr);
+                }
+            } catch (Exception e) {
+                log.error("解析AI响应JSON失败: {}", e.getMessage());
+                log.error("原始响应内容: {}", aiResponse);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI响应格式错误，请重试");
+            }
+            
+            if (!jsonResponse.containsKey("results")) {
+                log.error("AI响应缺少results字段: {}", jsonResponse);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI响应格式错误，缺少必要字段");
+            }
+            
             JSONArray results = jsonResponse.getJSONArray("results");
+            if (results == null || results.isEmpty()) {
+                log.error("AI响应results为空: {}", jsonResponse);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI响应格式错误，结果为空");
+            }
             
             // 保存评分结果
             for (int i = 0; i < results.size(); i++) {
                 JSONObject result = results.getJSONObject(i);
+                if (!result.containsKey("name") || !result.containsKey("scoreRange") || !result.containsKey("description")) {
+                    log.error("评分结果缺少必要字段: {}", result);
+                    continue;
+                }
+                
                 ScoringResult scoringResult = new ScoringResult();
                 scoringResult.setResultName(result.getStr("name"));
                 scoringResult.setResultDesc(result.getStr("description"));
-                scoringResult.setResultScoreRange(result.getInt("scoreRange"));
+                // 处理分数范围，确保是数字
+                String scoreRangeStr = result.getStr("scoreRange");
+                int scoreRange;
+                try {
+                    // 如果是字符串，尝试提取数字
+                    if (scoreRangeStr.contains("分")) {
+                        scoreRangeStr = scoreRangeStr.replaceAll("[^0-9]", "");
+                    }
+                    scoreRange = Integer.parseInt(scoreRangeStr);
+                } catch (NumberFormatException e) {
+                    log.error("分数范围格式错误: {}", scoreRangeStr);
+                    continue;
+                }
+                scoringResult.setResultScoreRange(scoreRange);
                 scoringResult.setIsDynamic(1); // 标记为AI生成
                 scoringResult.setQuestionBankId(questionBank.getId());
                 scoringResult.setUserId(questionBank.getUserId());
                 save(scoringResult);
+                log.info("保存评分结果: {}", scoringResult);
             }
         } catch (Exception e) {
             log.error("AI生成评分结果失败", e);
@@ -280,6 +366,16 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         good.setQuestionBankId(questionBank.getId());
         good.setUserId(questionBank.getUserId());
         save(good);
+
+        // 中等
+        ScoringResult medium = new ScoringResult();
+        medium.setResultName("中等");
+        medium.setResultDesc("表现一般，有较大的提升空间。");
+        medium.setResultScoreRange(70);
+        medium.setIsDynamic(0);
+        medium.setQuestionBankId(questionBank.getId());
+        medium.setUserId(questionBank.getUserId());
+        save(medium);
 
         // 及格
         ScoringResult pass = new ScoringResult();
