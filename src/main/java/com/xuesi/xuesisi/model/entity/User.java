@@ -50,6 +50,11 @@ public class User implements Serializable {
     private String userRole;
 
     /**
+     * 性别 0-女 1-男
+     */
+    private Integer gender;
+
+    /**
      * 
      */
     private Date createTime;

@@ -20,18 +20,24 @@ import com.xuesi.xuesisi.utils.SqlUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 /**
  * 用户服务实现
  */
 @Service
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private UserMapper userMapper;
 
     @Override
     public User createStudent(User user) {
@@ -73,10 +79,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public Page<User> getStudentsPage(int pageNumber, int pageSize) {
-        QueryWrapper<User> query = new QueryWrapper<>();
-        query.eq("user_role", "student");
-        Page<User> page = new Page<>(pageNumber, pageSize);
-        return page(page, query);
+        try {
+            // 参数校验和边界处理
+            if (pageNumber <= 0) {
+                pageNumber = 1;
+            }
+            if (pageSize <= 0) {
+                pageSize = 10;
+            }
+            if (pageSize > 100) {
+                pageSize = 100;
+            }
+
+            // 创建分页对象
+            Page<User> page = new Page<>(pageNumber, pageSize);
+            
+            // 构建查询条件
+            QueryWrapper<User> query = new QueryWrapper<>();
+            query.eq("user_role", "student");
+            
+            // 执行分页查询
+            return this.page(page, query);
+        } catch (Exception e) {
+            log.error("分页查询异常", e);
+            // 发生异常时返回空的第一页
+            return new Page<>(1, 10);
+        }
     }
 
     /**
@@ -85,7 +113,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public static final String SALT = "mar";
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String userName, Integer gender) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
@@ -114,6 +142,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             User user = new User();
             user.setUserAccount(userAccount);
             user.setUserPassword(encryptPassword);
+            user.setUserName(userName);
+            user.setGender(gender);
             boolean saveResult = this.save(user);
             if (!saveResult) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
@@ -151,27 +181,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return this.getLoginUserVO(user);
     }
 
-    /**
-     * 获取当前登录用户
-     *
-     * @param request
-     * @return
-     */
+    @Override
+    public User getLoginUser() {
+        HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+        return getLoginUser(request);
+    }
+
     @Override
     public User getLoginUser(HttpServletRequest request) {
-        // 先判断是否已登录
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
+        if (request == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
-        // 从数据库查询（追求性能的话可以注释，直接走缓存）
-        long userId = currentUser.getId();
-        currentUser = this.getById(userId);
-        if (currentUser == null) {
+
+        // 从 session 中获取用户信息
+        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (user == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
-        return currentUser;
+
+        return user;
     }
 
     /**
@@ -260,23 +288,56 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (userQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
         }
-        Long id = userQueryRequest.getId();
-        String unionId = userQueryRequest.getUnionId();
-        String mpOpenId = userQueryRequest.getMpOpenId();
-        String userName = userQueryRequest.getUserName();
-        String userProfile = userQueryRequest.getUserProfile();
-        String userRole = userQueryRequest.getUserRole();
-        String sortField = userQueryRequest.getSortField();
-        String sortOrder = userQueryRequest.getSortOrder();
+
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq(id != null, "id", id);
-        queryWrapper.eq(StringUtils.isNotBlank(unionId), "unionId", unionId);
-        queryWrapper.eq(StringUtils.isNotBlank(mpOpenId), "mpOpenId", mpOpenId);
-        queryWrapper.eq(StringUtils.isNotBlank(userRole), "userRole", userRole);
-        queryWrapper.like(StringUtils.isNotBlank(userProfile), "userProfile", userProfile);
-        queryWrapper.like(StringUtils.isNotBlank(userName), "userName", userName);
-        queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
-                sortField);
+        try {
+            Long id = userQueryRequest.getId();
+            String userName = userQueryRequest.getUserName();
+            String userProfile = userQueryRequest.getUserProfile();
+            String userRole = userQueryRequest.getUserRole();
+            Integer gender = userQueryRequest.getGender();
+            String sortField = userQueryRequest.getSortField();
+            String sortOrder = userQueryRequest.getSortOrder();
+
+            // 基本字段查询
+            if (id != null && id > 0) {
+                queryWrapper.eq("id", id);
+            }
+
+            if (StringUtils.isNotBlank(userRole)) {
+                queryWrapper.eq("user_role", userRole);
+            }
+
+            if (gender != null) {
+                queryWrapper.eq("gender", gender);
+            }
+
+            // 模糊查询（限制长度）
+            if (StringUtils.isNotBlank(userName)) {
+                String safeUserName = StringUtils.substring(userName, 0, 50);
+                queryWrapper.like("user_name", safeUserName);
+            }
+
+            if (StringUtils.isNotBlank(userProfile)) {
+                String safeUserProfile = StringUtils.substring(userProfile, 0, 50);
+                queryWrapper.like("user_profile", safeUserProfile);
+            }
+
+            // 排序处理
+            if (StringUtils.isNotBlank(sortField)) {
+                if (sortField.matches("^[a-zA-Z0-9_]{1,20}$")) {
+                    boolean isAsc = CommonConstant.SORT_ORDER_ASC.equals(sortOrder);
+                    queryWrapper.orderBy(true, isAsc, sortField);
+                }
+            } else {
+                // 默认按照创建时间降序
+                queryWrapper.orderByDesc("createTime");
+            }
+
+        } catch (Exception e) {
+            log.error("构建查询条件异常", e);
+        }
+
         return queryWrapper;
     }
 }

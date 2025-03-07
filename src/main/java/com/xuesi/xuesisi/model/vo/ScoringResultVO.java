@@ -1,62 +1,56 @@
 package com.xuesi.xuesisi.model.vo;
 
-import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.xuesi.xuesisi.model.entity.ScoringResult;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.List;
 
 /**
- * 评分结果视图
- *
+ * 评分结果视图对象
  */
 @Data
 public class ScoringResultVO implements Serializable {
-
     /**
-     * id
+     * 评分结果ID
      */
     private Long id;
 
     /**
-     * 结果名称，如物流师
-     */
-    private String resultName;
-
-    /**
-     * 结果描述
-     */
-    private String resultDesc;
-
-    /**
-     * 结果图片
-     */
-    private String resultPicture;
-
-    /**
-     * 结果属性集合 JSON，如 [I,S,T,J]
-     */
-    private List<String> resultProp;
-
-    /**
-     * 结果得分范围，如 80，表示 80及以上的分数命中此结果
-     */
-    private Integer resultScoreRange;
-
-    /**
-     * 应用 id
+     * 题库ID
      */
     private Long questionBankId;
 
     /**
-     * 创建用户 id
+     * 用户ID
      */
     private Long userId;
+
+    /**
+     * 用户名称
+     */
+    private String userName;
+
+    /**
+     * 用户信息
+     */
+    private UserVO user;
+
+    /**
+     * 得分
+     */
+    private Integer score;
+
+    /**
+     * 答题用时（秒）
+     */
+    private Integer duration;
+
+    /**
+     * 答题状态（0-未完成，1-已完成）
+     */
+    private Integer status;
 
     /**
      * 创建时间
@@ -69,25 +63,9 @@ public class ScoringResultVO implements Serializable {
     private Date updateTime;
 
     /**
-     * 创建用户信息
+     * 是否删除
      */
-    private UserVO user;
-
-    /**
-     * 封装类转对象
-     *
-     * @param scoringResultVO
-     * @return
-     */
-    public static ScoringResult voToObj(ScoringResultVO scoringResultVO) {
-        if (scoringResultVO == null) {
-            return null;
-        }
-        ScoringResult scoringResult = new ScoringResult();
-        BeanUtils.copyProperties(scoringResultVO, scoringResult);
-//        scoringResult.setResultProp(JSONUtil.toJsonStr(scoringResultVO.getResultProp()));
-        return scoringResult;
-    }
+    private Boolean isDelete;
 
     /**
      * 对象转封装类
@@ -101,7 +79,6 @@ public class ScoringResultVO implements Serializable {
         }
         ScoringResultVO scoringResultVO = new ScoringResultVO();
         BeanUtils.copyProperties(scoringResult, scoringResultVO);
-//        scoringResultVO.setResultProp(JSONUtil.toList(scoringResult.getResultProp(), String.class));
         return scoringResultVO;
     }
 }

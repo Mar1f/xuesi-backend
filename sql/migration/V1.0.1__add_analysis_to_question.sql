@@ -1,5 +1,29 @@
 -- 添加题目解析字段
-ALTER TABLE `question` 
+ALTER TABLE `question` ooiioioioiiioioioionkvjhccgch
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
 ADD COLUMN `analysis` TEXT NULL COMMENT '题目解析' 
 AFTER `source`;
 

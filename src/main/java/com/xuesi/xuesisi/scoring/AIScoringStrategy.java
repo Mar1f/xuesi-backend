@@ -12,11 +12,13 @@ import com.xuesi.xuesisi.model.entity.Question;
 import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
 import com.xuesi.xuesisi.model.entity.ScoringResult;
 import com.xuesi.xuesisi.model.entity.UserAnswer;
+import com.xuesi.xuesisi.model.entity.LearningAnalysis;
 import com.xuesi.xuesisi.service.DeepSeekService;
 import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.QuestionService;
 import com.xuesi.xuesisi.service.ScoringResultService;
 import com.xuesi.xuesisi.service.UserAnswerService;
+import com.xuesi.xuesisi.service.LearningAnalysisService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
@@ -44,6 +46,9 @@ public class AIScoringStrategy implements ScoringStrategy {
     
     @Resource
     private DeepSeekService deepSeekService;
+    
+    @Resource
+    private LearningAnalysisService learningAnalysisService;
 
     @Override
     public UserAnswer doScore(List<String> choices, QuestionBank questionBank) throws Exception {
@@ -79,19 +84,26 @@ public class AIScoringStrategy implements ScoringStrategy {
 
         // 2. 构建 AI 评分提示词
         StringBuilder aiRequest = new StringBuilder();
-        aiRequest.append("你是一个专业的教师，现在需要对一组答案进行评分和分析。请遵循以下规则：\n\n");
-        aiRequest.append("1. 每道题满分为10分\n");
-        aiRequest.append("2. 根据答案的完整性、准确性和表达来评分\n");
-        aiRequest.append("3. 对每道题都要给出详细的评分理由\n");
-        aiRequest.append("4. 最后给出总分（满分100分）\n\n");
-        aiRequest.append("请严格按照以下格式返回结果：\n");
-        aiRequest.append("总分：[分数]\n\n");
-        aiRequest.append("详细分析：\n");
-        aiRequest.append("第1题：[得分]/10分\n");
-        aiRequest.append("评分理由：[具体分析]\n");
-        aiRequest.append("改进建议：[建议]\n");
-        aiRequest.append("... (对每道题都要有类似的分析)\n\n");
-        aiRequest.append("总体评价：[整体表现分析]\n\n");
+        aiRequest.append("你是一个专业的教师，现在需要对一组答案进行评分和分析。请严格按照以下JSON格式返回结果：\n\n");
+        aiRequest.append("{\n");
+        aiRequest.append("  \"score\": 总分(0-100的整数),\n");
+        aiRequest.append("  \"analysis\": [\n");
+        aiRequest.append("    {\n");
+        aiRequest.append("      \"questionId\": 题目序号(从1开始),\n");
+        aiRequest.append("      \"userAnswer\": \"学生答案\",\n");
+        aiRequest.append("      \"score\": 得分(0或10分),\n");
+        aiRequest.append("      \"analysis\": \"详细的分析内容\",\n");
+        aiRequest.append("      \"suggestion\": \"具体的改进建议\"\n");
+        aiRequest.append("    }\n");
+        aiRequest.append("  ],\n");
+        aiRequest.append("  \"overallAnalysis\": \"总体评价和分析\",\n");
+        aiRequest.append("  \"overallSuggestion\": \"总体改进建议\"\n");
+        aiRequest.append("}\n\n");
+        aiRequest.append("注意事项：\n");
+        aiRequest.append("1. 每道题满分为10分，只能是0分或10分\n");
+        aiRequest.append("2. 分析内容要详细具体\n");
+        aiRequest.append("3. 改进建议要针对性强\n");
+        aiRequest.append("4. 总分是所有题目得分的总和\n\n");
         aiRequest.append("以下是题目和答案：\n\n");
         
         for (int i = 0; i < questions.size() && i < choices.size(); i++) {
@@ -153,8 +165,71 @@ public class AIScoringStrategy implements ScoringStrategy {
         // 保存 AI 的详细分析结果
         userAnswer.setResultDesc(aiResponse);
         
+        // 8. 保存学习分析结果
+        saveLearningAnalysis(questions, choices, aiResponse, totalScore, questionBank);
+        
         log.info("AI 评分完成，得分：{}，结果：{}", totalScore, finalResult.getResultName());
         return userAnswer;
+    }
+
+    /**
+     * 保存学习分析结果
+     */
+    private void saveLearningAnalysis(List<Question> questions, List<String> choices, String aiResponse, int totalScore, QuestionBank questionBank) {
+        try {
+            // 移除 JSON 代码块标记
+            aiResponse = aiResponse.replaceAll("```json\\s*", "").replaceAll("\\s*```", "");
+            
+            // 解析 JSON 响应
+            JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
+            JSONArray analysisArray = jsonResponse.getJSONArray("analysis");
+            String overallAnalysis = jsonResponse.getStr("overallAnalysis");
+            String overallSuggestion = jsonResponse.getStr("overallSuggestion");
+            
+            if (analysisArray == null || analysisArray.isEmpty()) {
+                log.warn("未找到题目分析数据");
+                return;
+            }
+            
+            // 保存每道题的分析
+            for (int i = 0; i < analysisArray.size(); i++) {
+                JSONObject analysisObj = analysisArray.getJSONObject(i);
+                Question question = questions.get(i);
+                
+                LearningAnalysis learningAnalysis = new LearningAnalysis();
+                learningAnalysis.setQuestionBankId(questionBank.getId());
+                learningAnalysis.setQuestionId(question.getId());
+                learningAnalysis.setUserAnswer(analysisObj.getStr("userAnswer"));
+                learningAnalysis.setScore(analysisObj.getInt("score"));
+                learningAnalysis.setAnalysis(analysisObj.getStr("analysis"));
+                learningAnalysis.setSuggestion(analysisObj.getStr("suggestion"));
+                learningAnalysis.setIsOverall(false);
+                
+                learningAnalysisService.save(learningAnalysis);
+                log.info("保存题目分析成功，题目ID：{}", question.getId());
+            }
+            
+            // 保存总体评价
+            LearningAnalysis overall = new LearningAnalysis();
+            overall.setQuestionBankId(questionBank.getId());
+            overall.setScore(totalScore);
+            overall.setAnalysis(overallAnalysis);
+            overall.setSuggestion(overallSuggestion);
+            overall.setIsOverall(true);
+            
+            learningAnalysisService.save(overall);
+            
+            log.info("成功保存学习分析结果，题库ID：{}", questionBank.getId());
+        } catch (Exception e) {
+            log.error("保存学习分析结果失败: {}", e.getMessage(), e);
+        }
+    }
+    
+    private String extractSuggestionFromAnalysis(String analysis) {
+        // 从分析文本中提取建议
+        // 通常是分析文本的后半部分，从"建议"或"因此"开始
+        String[] parts = analysis.split("因此|建议");
+        return parts.length > 1 ? parts[1].trim() : analysis;
     }
 
     private int parseScore(String aiResponse) {

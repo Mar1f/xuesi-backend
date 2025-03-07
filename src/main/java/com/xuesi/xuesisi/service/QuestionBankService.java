@@ -1,85 +1,121 @@
 package com.xuesi.xuesisi.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.xuesi.xuesisi.model.entity.QuestionBank;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
+import com.xuesi.xuesisi.model.entity.ScoringResult;
+import com.xuesi.xuesisi.model.vo.QuestionBankVO;
+import com.xuesi.xuesisi.model.vo.QuestionVO;
+import com.xuesi.xuesisi.model.vo.ScoringResultVO;
 
 import java.util.List;
 
 /**
-* @author mar1
-* @description 针对表【question_bank(题单表)】的数据库操作Service
-* @createDate 2025-03-02 15:47:32
-*/
+ * 题库服务接口
+ */
 public interface QuestionBankService extends IService<QuestionBank> {
-    /**
-     * 校验数据
-     *
-     * @param questionBank
-     * @param add           对创建的数据进行校验
-     */
-    void validQuestionBank(QuestionBank questionBank, boolean add);
 
     /**
-     * 创建题单
+     * 创建题库
      *
-     * @param questionBank
-     * @return
+     * @param questionBank 题库信息
+     * @return 题库ID
      */
-    QuestionBank createQuestionBank(QuestionBank questionBank);
+    Long createQuestionBank(QuestionBank questionBank);
 
     /**
-     * 根据ID获取题单
+     * 更新题库
      *
-     * @param id
-     * @return
+     * @param questionBank 题库信息
+     * @return 是否更新成功
      */
-    QuestionBank getQuestionBankById(Long id);
+    boolean updateQuestionBank(QuestionBank questionBank);
 
     /**
-     * 获取所有题单
+     * 删除题库
      *
-     * @return
+     * @param id 题库ID
+     * @return 是否删除成功
      */
-    List<QuestionBank> getAllQuestionBanks();
+    boolean deleteQuestionBank(Long id);
 
     /**
-     * 更新题单
+     * 获取题库详情
      *
-     * @param id
-     * @param questionBank
-     * @return
+     * @param id 题库ID
+     * @return 题库详情
      */
-    QuestionBank updateQuestionBank(Long id, QuestionBank questionBank);
+    QuestionBankVO getQuestionBankById(Long id);
 
     /**
-     * 删除题单
+     * 分页查询题库列表
      *
-     * @param id
+     * @param current 当前页码
+     * @param size    每页大小
+     * @return 题库列表
      */
-    void deleteQuestionBank(Long id);
+    Page<QuestionBankVO> listQuestionBanks(long current, long size);
 
     /**
-     * 分页获取题单
+     * 添加题目到题库
      *
-     * @param pageNumber
-     * @param pageSize
-     * @return
+     * @param questionBankId 题库ID
+     * @param questionIds    题目ID列表
+     * @return 是否添加成功
      */
-    Page<QuestionBank> getQuestionBanksPage(int pageNumber, int pageSize);
-    
-    /**
-     * 为题库初始化评分结果
-     *
-     * @param questionBank
-     */
-    void initScoringResults(QuestionBank questionBank);
+    boolean addQuestionsToBank(Long questionBankId, List<Long> questionIds);
 
     /**
-     * 添加题单
+     * 从题库中移除题目
      *
-     * @param questionBank
-     * @return
+     * @param questionBankId 题库ID
+     * @param questionIds    题目ID列表
+     * @return 是否移除成功
      */
-    long addQuestionBank(QuestionBank questionBank);
+    boolean removeQuestionsFromBank(Long questionBankId, List<Long> questionIds);
+
+    /**
+     * 获取题库中的题目列表
+     *
+     * @param questionBankId 题库ID
+     * @return 题目列表
+     */
+    List<QuestionVO> getQuestionsByBankId(Long questionBankId);
+
+    /**
+     * 初始化评分结果
+     *
+     * @param questionBankId 题库ID
+     * @param userId        用户ID
+     * @return 评分结果
+     */
+    ScoringResultVO initializeScoringResult(Long questionBankId, Long userId);
+
+    /**
+     * 提交答案并评分
+     *
+     * @param questionBankId 题库ID
+     * @param userId        用户ID
+     * @param answers      答案列表
+     * @return 评分结果
+     */
+    ScoringResultVO submitAnswers(Long questionBankId, Long userId, List<String> answers);
+
+    /**
+     * 获取用户的评分历史
+     *
+     * @param questionBankId 题库ID
+     * @param userId        用户ID
+     * @return 评分历史列表
+     */
+    List<ScoringResultVO> getScoringHistory(Long questionBankId, Long userId);
+
+    /**
+     * 获取题库的统计信息
+     *
+     * @param questionBankId 题库ID
+     * @return 统计信息
+     */
+    QuestionBankVO getQuestionBankStats(Long questionBankId);
 }

@@ -13,30 +13,59 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * 题目视图
- *
+ * 题目视图对象
  */
 @Data
 public class QuestionVO implements Serializable {
     /**
-     * id
+     * 题目ID
      */
     private Long id;
 
     /**
-     * 题目内容（json格式）
+     * 题目内容
      */
-    private List<QuestionContentDTO> questionContent;
+    private String content;
 
     /**
-     * 应用 id
+     * 题目类型
      */
-    private Long questionBankId;
+    private Integer type;
 
     /**
-     * 创建用户 id
+     * 选项列表
      */
-    private Long userId;
+    private List<String> options;
+
+    /**
+     * 答案
+     */
+    private List<String> answers;
+
+    /**
+     * 解析
+     */
+    private String analysis;
+
+    /**
+     * 分值
+     */
+    private Integer score;
+
+    /**
+     * 标签列表
+     */
+    private List<String> tags;
+
+    /**
+     * 创建者ID
+     */
+    private Long creatorId;
+
+    /**
+     * 创建者名称
+     */
+    private String creatorName;
 
     /**
      * 创建时间
@@ -49,9 +78,28 @@ public class QuestionVO implements Serializable {
     private Date updateTime;
 
     /**
-     * 创建用户信息
+     * 是否删除
      */
-    private UserVO user;
+    private Boolean isDelete;
+
+    /**
+     * 题目内容列表
+     */
+    private List<QuestionContentDTO> questionContent;
+
+    /**
+     * 获取题目内容列表
+     */
+    public List<QuestionContentDTO> getQuestionContent() {
+        return questionContent;
+    }
+
+    /**
+     * 设置题目内容列表
+     */
+    public void setQuestionContent(List<QuestionContentDTO> questionContent) {
+        this.questionContent = questionContent;
+    }
 
     /**
      * 封装类转对象

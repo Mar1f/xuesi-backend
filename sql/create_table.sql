@@ -24,30 +24,53 @@ CREATE TABLE IF NOT EXISTS `user` (
 -- ----------------------------
 -- 班级表
 -- ----------------------------
+
 CREATE TABLE IF NOT EXISTS `class` (
-     `id`          BIGINT AUTO_INCREMENT COMMENT '班级ID' PRIMARY KEY,
-     `className`   VARCHAR(128) NOT NULL COMMENT '班级名称',
-    `teacherId`   BIGINT       NOT NULL COMMENT '教师ID（关联user.id）',
-    `createTime`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updateTime`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `isDelete`    TINYINT      NOT NULL DEFAULT 0,
-    INDEX `idx_teacherId` (`teacherId`)
-    ) COMMENT '班级表' COLLATE = utf8mb4_unicode_ci;
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `className` varchar(50) NOT NULL COMMENT '班级名称',
+    `teacherId` bigint NOT NULL COMMENT '班主任ID',
+    `description` varchar(500) DEFAULT NULL COMMENT '班级描述',
+    `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `isDelete` tinyint DEFAULT '0' COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_teacherId` (`teacherId`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='班级表';
 
 -- ----------------------------
 -- 学生班级关系表（
 -- ----------------------------
-CREATE TABLE IF NOT EXISTS `user_class` (
-      `id`         BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
-      `userId`     BIGINT   NOT NULL COMMENT '学生ID',
-      `classId`    BIGINT   NOT NULL COMMENT '班级ID',
-      `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE (userId, classId)
-    ) COMMENT '学生班级关系表' COLLATE = utf8mb4_unicode_ci;
-
+USE `xuesisi`;
+CREATE TABLE IF NOT EXISTS `student_class` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `class_id` bigint NOT NULL COMMENT '班级ID',
+    `student_id` bigint NOT NULL COMMENT '学生ID',
+    `join_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_class_student` (`class_id`,`student_id`),
+    KEY `idx_student_id` (`student_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学生-班级关联表';
 -- ----------------------------
 -- 题单表
 -- ----------------------------
+
+CREATE TABLE IF NOT EXISTS `teacher_class` (
+     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+     `teacherId` bigint NOT NULL COMMENT '教师ID',
+     `classId` bigint NOT NULL COMMENT '班级ID',
+     `subject` varchar(50) NOT NULL COMMENT '任教科目',
+     `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+     `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+     `isDelete` tinyint DEFAULT '0' COMMENT '是否删除',
+     PRIMARY KEY (`id`),
+     UNIQUE KEY `uk_teacher_class_subject` (`teacherId`, `classId`, `subject`),
+     KEY `idx_teacherId` (`teacherId`),
+     KEY `idx_classId` (`classId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='教师-班级关联表';
+
 USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `question_bank` (
     `id`               BIGINT AUTO_INCREMENT COMMENT '题单ID' PRIMARY KEY,
@@ -58,6 +81,7 @@ CREATE TABLE IF NOT EXISTS `question_bank` (
     `scoringStrategy`  TINYINT       NOT NULL DEFAULT 0 COMMENT '评分策略: 0-自定义, 1-AI',
     `totalScore`       INT           NOT NULL DEFAULT 100 COMMENT '题单总分',
     `passScore`        INT           NOT NULL DEFAULT 60 COMMENT '及格分',
+    `classId` bigint NOT NULL COMMENT '所属班级ID',
     `endTime`          DATETIME      NULL COMMENT '截止时间',
     `reviewStatus`     TINYINT       NOT NULL DEFAULT 0 COMMENT '审核状态: 0-待审, 1-通过, 2-拒绝',
     `reviewMessage`    VARCHAR(512)  NULL COMMENT '审核信息',
@@ -160,9 +184,24 @@ CREATE TABLE IF NOT EXISTS `user_answer_detail` (
     INDEX `idx_userId` (`userId`)
  )
 USE `xuesisi`;
-ALTER TABLE `question_bank`
-    ADD COLUMN `questionCount` INT NOT NULL DEFAULT 0 COMMENT '题目数量'
-AFTER `isDelete`;
+CREATE TABLE IF NOT EXISTS `learning_analysis` (
+     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+     `questionBankId` bigint NOT NULL COMMENT '题库ID',
+     `questionId` bigint DEFAULT NULL COMMENT '题目ID',
+     `userAnswer` text COMMENT '用户答案',
+     `score` int DEFAULT NULL COMMENT '得分',
+     `analysis` text COMMENT '分析内容',
+     `suggestion` text COMMENT '改进建议',
+      `isOverall` tinyint(1) DEFAULT '0' COMMENT '是否为总体评价',
+      `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+      `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+      `isDelete` tinyint DEFAULT '0' COMMENT '是否删除',
+      PRIMARY KEY (`id`),
+      KEY `idx_questionBankId` (`questionBankId`),
+      KEY `idx_questionId` (`questionId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学习分析表';
+
+
 
 -- ----------------------------
 -- 知识点表

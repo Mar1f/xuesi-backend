@@ -22,9 +22,11 @@ public interface UserService extends IService<User> {
      * @param userAccount   用户账户
      * @param userPassword  用户密码
      * @param checkPassword 校验密码
+     * @param userName      用户昵称
+     * @param gender        性别
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword);
+    long userRegister(String userAccount, String userPassword, String checkPassword, String userName, Integer gender);
 
     /**
      * 用户登录
@@ -35,6 +37,13 @@ public interface UserService extends IService<User> {
      * @return 脱敏后的用户信息
      */
     LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request);
+
+    /**
+     * 获取当前登录用户
+     *
+     * @return 当前登录用户
+     */
+    User getLoginUser();
 
     /**
      * 获取当前登录用户

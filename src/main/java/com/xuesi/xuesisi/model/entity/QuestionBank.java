@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.io.Serializable;
 import java.util.Date;
 import lombok.Data;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 
 /**
  * 题单表
@@ -99,6 +100,7 @@ public class QuestionBank implements Serializable {
     /**
      * 
      */
+    @TableLogic
     private Integer isDelete;
 
     /**
@@ -110,6 +112,16 @@ public class QuestionBank implements Serializable {
      * 学科
      */
     private String subject;
+
+    /**
+     * 班级ID
+     */
+    private Long classId;
+
+    /**
+     * 教师ID
+     */
+    private Long teacherId;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

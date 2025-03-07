@@ -1,65 +1,180 @@
 package com.xuesi.xuesisi.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xuesi.xuesisi.common.BaseResponse;
+import com.xuesi.xuesisi.common.ErrorCode;
+import com.xuesi.xuesisi.common.ResultUtils;
+import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.entity.Class;
+import com.xuesi.xuesisi.model.entity.User;
+import com.xuesi.xuesisi.model.vo.ClassVO;
 import com.xuesi.xuesisi.service.ClassService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import com.xuesi.xuesisi.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
- * @description；
- * @author:mar1
- * @data:2025/03/02
- **/
+ * 班级接口
+ */
 @RestController
-@RequestMapping("/classes")
+@RequestMapping("/class")
+@Slf4j
 public class ClassController {
 
     @Resource
     private ClassService classService;
 
-    // 创建班级
-    @PostMapping
-    public ResponseEntity<Class> createClass(@RequestBody Class classEntity) {
-        Class createdClass = classService.createClass(classEntity);
-        return new ResponseEntity<>(createdClass, HttpStatus.CREATED);
-    }
+    @Resource
+    private UserService userService;
 
-    // 根据ID查询班级
-    @GetMapping("/{id}")
-    public ResponseEntity<Class> getClass(@PathVariable Long id) {
-        Class classEntity = classService.getClassById(id);
-        if (classEntity != null) {
-            return ResponseEntity.ok(classEntity);
+    /**
+     * 创建班级
+     */
+    @PostMapping("/create")
+    public BaseResponse<Long> createClass(@RequestBody Class classEntity) {
+        if (classEntity == null || classEntity.getClassName() == null || classEntity.getTeacherId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        return ResponseEntity.notFound().build();
-    }
-
-    // 查询所有班级
-    @GetMapping
-    public ResponseEntity<List<Class>> getAllClasses() {
-        List<Class> classes = classService.getAllClasses();
-        return ResponseEntity.ok(classes);
-    }
-
-    // 修改班级信息
-    @PutMapping("/{id}")
-    public ResponseEntity<Class> updateClass(@PathVariable Long id, @RequestBody Class Class) {
-        Class updatedClass = classService.updateClass(id, Class);
-        if (updatedClass != null) {
-            return ResponseEntity.ok(updatedClass);
+        
+        // 验证教师是否存在
+        User teacher = userService.getById(classEntity.getTeacherId());
+        if (teacher == null || !"teacher".equals(teacher.getUserRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "教师不存在");
         }
-        return ResponseEntity.notFound().build();
+        
+        Long classId = classService.createClass(
+            classEntity.getClassName(),
+            classEntity.getTeacherId(),
+            classEntity.getDescription()
+        );
+        return ResultUtils.success(classId);
     }
 
-    // 删除班级
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteClass(@PathVariable Long id) {
-        classService.deleteClass(id);
-        return ResponseEntity.noContent().build();
+    /**
+     * 更新班级信息
+     */
+    @PostMapping("/update")
+    public BaseResponse<Boolean> updateClass(@RequestBody Class classEntity) {
+        if (classEntity == null || classEntity.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.updateClass(classEntity);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 删除班级
+     */
+    @PostMapping("/delete")
+    public BaseResponse<Boolean> deleteClass(@RequestParam Long id) {
+        if (id == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.deleteClass(id);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 分页获取班级列表
+     */
+    @GetMapping("/list")
+    public BaseResponse<Page<ClassVO>> listClasses(
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "10") long size) {
+        Page<ClassVO> classPage = classService.listClasses(current, size);
+        return ResultUtils.success(classPage);
+    }
+
+    /**
+     * 获取班级详情
+     */
+    @GetMapping("/get")
+    public BaseResponse<ClassVO> getClassById(@RequestParam Long id) {
+        if (id == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        ClassVO classVO = classService.getClassById(id);
+        return ResultUtils.success(classVO);
+    }
+
+    /**
+     * 添加学生到班级
+     */
+    @PostMapping("/addStudent")
+    public BaseResponse<Boolean> addStudentToClass(
+            @RequestParam Long classId,
+            @RequestParam Long studentId) {
+        if (classId == null || studentId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.addStudentToClass(classId, studentId);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 从班级中移除学生
+     */
+    @PostMapping("/removeStudent")
+    public BaseResponse<Boolean> removeStudentFromClass(
+            @RequestParam Long classId,
+            @RequestParam Long studentId) {
+        if (classId == null || studentId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.removeStudentFromClass(classId, studentId);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 添加教师到班级
+     */
+    @PostMapping("/addTeacher")
+    public BaseResponse<Boolean> addTeacherToClass(
+            @RequestParam Long classId,
+            @RequestParam Long teacherId,
+            @RequestParam String subject) {
+        if (classId == null || teacherId == null || subject == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.addTeacherToClass(classId, teacherId, subject);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 从班级中移除教师
+     */
+    @PostMapping("/removeTeacher")
+    public BaseResponse<Boolean> removeTeacherFromClass(
+            @RequestParam Long classId,
+            @RequestParam Long teacherId,
+            @RequestParam String subject) {
+        if (classId == null || teacherId == null || subject == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = classService.removeTeacherFromClass(classId, teacherId, subject);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 学生转班
+     */
+    @PostMapping("/transferStudent")
+    public BaseResponse<Boolean> transferStudent(
+            @RequestParam Long studentId,
+            @RequestParam Long fromClassId,
+            @RequestParam Long toClassId,
+            HttpServletRequest request) {
+        if (studentId == null || fromClassId == null || toClassId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 验证当前用户是否有权限进行转班操作
+        Long currentUserId = userService.getLoginUser(request).getId();
+        boolean result = classService.transferStudent(studentId, fromClassId, toClassId, currentUserId);
+        return ResultUtils.success(result);
     }
 }

@@ -6,11 +6,11 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 班级实体
+ * 教师-班级关联实体
  */
 @Data
-@TableName("class")
-public class Class implements Serializable {
+@TableName("teacher_class")
+public class TeacherClass implements Serializable {
 
     /**
      * 主键
@@ -19,19 +19,19 @@ public class Class implements Serializable {
     private Long id;
 
     /**
-     * 班级名称
-     */
-    private String className;
-
-    /**
-     * 班主任ID
+     * 教师ID
      */
     private Long teacherId;
 
     /**
-     * 班级描述
+     * 班级ID
      */
-    private String description;
+    private Long classId;
+
+    /**
+     * 任教科目
+     */
+    private String subject;
 
     /**
      * 创建时间
@@ -51,4 +51,4 @@ public class Class implements Serializable {
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
-}
+} 

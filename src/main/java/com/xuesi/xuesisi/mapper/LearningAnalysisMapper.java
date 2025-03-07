@@ -1,16 +1,14 @@
 package com.xuesi.xuesisi.mapper;
 
-import com.xuesi.xuesisi.model.entity.LearningAnalysis;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xuesi.xuesisi.model.entity.LearningAnalysis;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
-* @author mar1
-* @description 针对表【learning_analysis(学习分析统计表)】的数据库操作Mapper
-* @createDate 2025-03-02 15:47:32
-* @Entity com.xuesi.xuesisi.model.entity.LearningAnalysis
-*/
+ * 学习分析 Mapper 接口
+ */
+@Mapper
 public interface LearningAnalysisMapper extends BaseMapper<LearningAnalysis> {
-
 }
 
 

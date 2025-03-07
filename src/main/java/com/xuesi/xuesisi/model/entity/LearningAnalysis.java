@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -16,6 +17,14 @@ import lombok.Data;
 @TableName(value ="learning_analysis")
 @Data
 public class LearningAnalysis implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键
+     */
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
     /**
      * 学生ID
      */
@@ -47,10 +56,53 @@ public class LearningAnalysis implements Serializable {
     private String tagStats;
 
     /**
-     * 
+     * 题库ID
+     */
+    private Long questionBankId;
+
+    /**
+     * 题目ID
+     */
+    private Long questionId;
+
+    /**
+     * 用户答案
+     */
+    private String userAnswer;
+
+    /**
+     * 得分
+     */
+    private Integer score;
+
+    /**
+     * 分析内容
+     */
+    private String analysis;
+
+    /**
+     * 改进建议
+     */
+    private String suggestion;
+
+    /**
+     * 是否为总体评价
+     */
+    private Boolean isOverall;
+
+    /**
+     * 创建时间
      */
     private Date createTime;
 
-    @TableField(exist = false)
-    private static final long serialVersionUID = 1L;
+    /**
+     * 更新时间
+     */
+    private Date updateTime;
+
+    /**
+     * 是否删除
+     */
+    @TableLogic
+    private Integer isDelete;
 }
