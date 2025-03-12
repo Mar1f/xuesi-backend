@@ -31,7 +31,7 @@ public class QuestionController {
 
     @Resource
     private QuestionService questionService;
-    
+
     @Resource
     private UserService userService;
 
@@ -44,7 +44,7 @@ public class QuestionController {
      */
     @PostMapping("/add")
     public BaseResponse<Question> createQuestion(@RequestBody CreateQuestionRequest createQuestionRequest,
-                                               HttpServletRequest request) {
+                                                 HttpServletRequest request) {
         if (createQuestionRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }

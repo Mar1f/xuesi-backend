@@ -26,6 +26,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 
 /**
  * AI 评分策略
@@ -50,6 +54,8 @@ public class AIScoringStrategy implements ScoringStrategy {
     @Resource
     private LearningAnalysisService learningAnalysisService;
 
+    @Transactional(rollbackFor = Exception.class)
+    @Retryable(value = {DataAccessException.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
     @Override
     public UserAnswer doScore(List<String> choices, QuestionBank questionBank) throws Exception {
         if (questionBank == null || questionBank.getId() == null) {
@@ -124,25 +130,42 @@ public class AIScoringStrategy implements ScoringStrategy {
         int totalScore = parseScore(aiResponse);
         int maxPossibleScore = questions.size() * 10; // 计算最大可能分数
         
-        log.info("AI 返回的评分结果: {}", aiResponse);
+        log.info("AI 返回的评分结果: {}, 总分: {}, 最大可能分数: {}", 
+            aiResponse, totalScore, maxPossibleScore);
         
         // 5. 获取评分结果（按分数降序排序）
-        List<ScoringResult> scoringResultList = scoringResultService.list(
-            Wrappers.lambdaQuery(ScoringResult.class)
-                .eq(ScoringResult::getQuestionBankId, questionBankId)
-                .orderByDesc(ScoringResult::getResultScoreRange)
-        );
-        
-        if (scoringResultList.isEmpty()) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "评分结果不存在，请先配置评分结果");
+        List<ScoringResult> scoringResultList = null;
+        try {
+            scoringResultList = scoringResultService.list(
+                Wrappers.lambdaQuery(ScoringResult.class)
+                    .eq(ScoringResult::getQuestionBankId, questionBankId)
+                    .orderByDesc(ScoringResult::getResultScoreRange)
+            );
+            
+            if (scoringResultList.isEmpty()) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "评分结果不存在，请先配置评分结果");
+            }
+        } catch (DataAccessException e) {
+            log.error("数据库访问失败，尝试重新连接: {}", e.getMessage());
+            Thread.sleep(1000);
+            scoringResultList = scoringResultService.list(
+                Wrappers.lambdaQuery(ScoringResult.class)
+                    .eq(ScoringResult::getQuestionBankId, questionBankId)
+                    .orderByDesc(ScoringResult::getResultScoreRange)
+            );
         }
-
+        
         // 6. 根据得分范围确定最终结果
         ScoringResult finalResult = null;
         for (ScoringResult scoringResult : scoringResultList) {
-            if (totalScore >= scoringResult.getResultScoreRange()) {
+            // 将评分结果的分数范围转换为实际分数（乘以题目数）
+            int actualScoreRange = (scoringResult.getResultScoreRange() * maxPossibleScore) / 100;
+            if (totalScore >= actualScoreRange) {
                 finalResult = scoringResult;
-                log.info("匹配到评分结果：{}", scoringResult.getResultName());
+                log.info("匹配到评分结果：{}，分数范围：{}，实际分数范围：{}", 
+                    scoringResult.getResultName(), 
+                    scoringResult.getResultScoreRange(),
+                    actualScoreRange);
                 break;
             }
         }
@@ -161,9 +184,8 @@ public class AIScoringStrategy implements ScoringStrategy {
         userAnswer.setChoices(JSONUtil.toJsonStr(choices));
         userAnswer.setResultId(finalResult.getId());
         userAnswer.setResultName(finalResult.getResultName());
-        userAnswer.setResultScore(totalScore);
-        // 保存 AI 的详细分析结果
-        userAnswer.setResultDesc(aiResponse);
+        userAnswer.setResultScore(totalScore); // 使用原始分数
+        userAnswer.setResultDesc(finalResult.getResultDesc());
         
         // 8. 保存学习分析结果
         saveLearningAnalysis(questions, choices, aiResponse, totalScore, questionBank);
@@ -236,84 +258,61 @@ public class AIScoringStrategy implements ScoringStrategy {
         log.info("AI 评分结果原文: {}", aiResponse);
         
         try {
+            // 移除markdown代码块标记
+            aiResponse = aiResponse.replaceAll("```json\\s*", "")
+                                 .replaceAll("```\\s*", "")
+                                 .trim();
+            
+            // 修复常见的JSON格式问题
+            aiResponse = aiResponse.replaceAll("(?m)\"analysis\":\\s*\"[^\"]*\"\\s*$", "$0,") // 修复缺少逗号的行
+                                 .replaceAll("(?m)\"suggestion\":\\s*\"[^\"]*\"\\s*$", "$0,") // 修复缺少逗号的行
+                                 .replaceAll(",\\s*}", "}") // 移除对象末尾多余的逗号
+                                 .replaceAll(",\\s*]", "]"); // 移除数组末尾多余的逗号
+            
             // 尝试解析 JSON 格式
             JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
-            if (jsonResponse.containsKey("totalScore")) {
-                return jsonResponse.getInt("totalScore");
-            }
-            if (jsonResponse.containsKey("score")) {
-                return jsonResponse.getInt("score");
-            }
-            if (jsonResponse.containsKey("total")) {
-                return jsonResponse.getInt("total");
-            }
-            if (jsonResponse.containsKey("questions")) {
-                JSONArray questions = jsonResponse.getJSONArray("questions");
+            
+            // 首先尝试从 analysis 数组中计算总分
+            if (jsonResponse.containsKey("analysis")) {
+                JSONArray analysisArray = jsonResponse.getJSONArray("analysis");
                 int totalScore = 0;
-                for (int i = 0; i < questions.size(); i++) {
-                    JSONObject question = questions.getJSONObject(i);
-                    if (question.containsKey("score")) {
-                        totalScore += question.getInt("score");
+                log.info("开始解析题目分析，共 {} 道题", analysisArray.size());
+                
+                for (int i = 0; i < analysisArray.size(); i++) {
+                    JSONObject analysisObj = analysisArray.getJSONObject(i);
+                    if (analysisObj.containsKey("score")) {
+                        int questionScore = analysisObj.getInt("score");
+                        totalScore += questionScore;
+                        log.info("第 {} 题得分：{}", i + 1, questionScore);
                     }
                 }
-                return totalScore;
-            }
-        } catch (Exception e) {
-            log.warn("JSON 解析失败，尝试解析文本格式: {}", e.getMessage());
-        }
-
-        // 尝试解析文本格式
-        try {
-            // 匹配总分格式：总分：24/40 或 总分：24 或 得分：24分
-            Pattern[] totalScorePatterns = {
-                Pattern.compile("总分[：:](\\s*)(\\d+)/(\\d+)"),  // 匹配 总分：24/40
-                Pattern.compile("总分[：:](\\s*)(\\d+)分?"),      // 匹配 总分：24 或 总分：24分
-                Pattern.compile("得分[：:](\\s*)(\\d+)分?"),      // 匹配 得分：24 或 得分：24分
-                Pattern.compile("(\\d+)分"),                      // 匹配 24分
-                Pattern.compile("(\\d+)/(\\d+)")                  // 匹配 24/40
-            };
-
-            for (Pattern pattern : totalScorePatterns) {
-                Matcher matcher = pattern.matcher(aiResponse);
-                if (matcher.find()) {
-                    if (matcher.groupCount() >= 3) {
-                        // 格式：总分：24/40
-                        int score = Integer.parseInt(matcher.group(2));
-                        int total = Integer.parseInt(matcher.group(3));
-                        return (int) ((score * 100.0) / total);
-                    } else {
-                        // 格式：总分：24 或 得分：24分 或 24分
-                        int score = Integer.parseInt(matcher.group(matcher.groupCount()));
-                        return score;
-                    }
+                
+                log.info("从analysis数组计算的总分：{}", totalScore);
+                if (totalScore > 0) {
+                    return totalScore;
                 }
             }
-
-            // 匹配单个题目分数：第1题：9/10分
-            Pattern questionScorePattern = Pattern.compile("第\\d+题[：:](\\s*)(\\d+)/(\\d+)分");
-            Matcher matcher = questionScorePattern.matcher(aiResponse);
-            int totalScore = 0;
-            int totalPossible = 0;
-            while (matcher.find()) {
-                int score = Integer.parseInt(matcher.group(2));
-                int possible = Integer.parseInt(matcher.group(3));
-                totalScore += score;
-                totalPossible += possible;
+            
+            // 如果无法从analysis计算总分，尝试使用score字段
+            if (jsonResponse.containsKey("score")) {
+                int score = jsonResponse.getInt("score");
+                log.info("从score字段获取总分：{}", score);
+                return score;
             }
-            if (totalPossible > 0) {
-                return (int) ((totalScore * 100.0) / totalPossible);
+            
+            // 其他字段尝试
+            if (jsonResponse.containsKey("totalScore")) {
+                int score = jsonResponse.getInt("totalScore");
+                log.info("从totalScore字段获取总分：{}", score);
+                return score;
             }
-
-            // 如果以上都没匹配到，尝试提取文本中的数字
-            Pattern numberPattern = Pattern.compile("\\d+");
-            matcher = numberPattern.matcher(aiResponse);
-            if (matcher.find()) {
-                return Integer.parseInt(matcher.group());
-            }
+            
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "AI响应中未找到有效的分数");
+            
         } catch (Exception e) {
-            log.error("文本格式解析失败: {}", e.getMessage());
+            log.error("JSON解析失败，原始响应: {}", aiResponse);
+            log.error("错误详情: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "解析AI评分结果失败: " + e.getMessage());
         }
-
-        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "无法解析 AI 评分结果");
     }
 } 

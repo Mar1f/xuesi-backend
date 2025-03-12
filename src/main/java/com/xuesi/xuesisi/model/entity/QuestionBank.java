@@ -121,7 +121,14 @@ public class QuestionBank implements Serializable {
     /**
      * 教师ID
      */
+    @TableField(exist = false)
     private Long teacherId;
+
+    /**
+     * 知识点标签
+     */
+    @TableField(exist = false)
+    private String knowledgeTags;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

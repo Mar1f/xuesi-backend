@@ -12,17 +12,16 @@ import java.util.stream.Collectors;
  */
 public enum ReviewStatusEnum {
 
-    REVIEWING("待审核", 0),
-    PASS("通过", 1),
-    REJECT("拒绝", 2);
-
-    private final String text;
+    WAITING(0, "待审核"),
+    PASSED(1, "已通过"),
+    REJECTED(2, "已拒绝");
 
     private final int value;
+    private final String text;
 
-    ReviewStatusEnum(String text, int value) {
-        this.text = text;
+    ReviewStatusEnum(int value, String text) {
         this.value = value;
+        this.text = text;
     }
 
     /**
@@ -31,12 +30,9 @@ public enum ReviewStatusEnum {
      * @param value
      * @return
      */
-    public static ReviewStatusEnum getEnumByValue(Integer value) {
-        if (ObjectUtil.isEmpty(value)) {
-            return null;
-        }
+    public static ReviewStatusEnum getEnumByValue(int value) {
         for (ReviewStatusEnum anEnum : ReviewStatusEnum.values()) {
-            if (anEnum.value == value) {
+            if (anEnum.getValue() == value) {
                 return anEnum;
             }
         }

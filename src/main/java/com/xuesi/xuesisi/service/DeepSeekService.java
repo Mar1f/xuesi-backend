@@ -39,13 +39,13 @@ public class DeepSeekService {
      * @return AI 响应结果
      */
     @Retryable(
-        value = {RestClientException.class},
-        maxAttempts = MAX_RETRIES,
-        backoff = @Backoff(delay = RETRY_DELAY)
+            value = {RestClientException.class},
+            maxAttempts = MAX_RETRIES,
+            backoff = @Backoff(delay = RETRY_DELAY)
     )
     public String chat(String prompt) {
         log.info("开始调用 DeepSeek API 进行对话");
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(deepSeekConfig.getApiKey());
@@ -68,7 +68,7 @@ public class DeepSeekService {
         requestBody.put("frequency_penalty", 0.5);
         requestBody.put("presence_penalty", 0.5);
         requestBody.put("n", 1);
-        
+
         // 添加系统消息
         List<Map<String, Object>> allMessages = new ArrayList<>();
         Map<String, Object> systemMessage = new HashMap<>();
@@ -103,35 +103,35 @@ public class DeepSeekService {
         try {
             log.debug("发送请求到 DeepSeek API，prompt: {}", prompt);
             Map<String, Object> response = restTemplate.postForObject(deepSeekConfig.getApiUrl(), request, Map.class);
-            
+
             if (response == null) {
                 log.error("DeepSeek API 返回空响应");
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 服务返回空响应");
             }
-            
+
             if (!response.containsKey("choices")) {
                 log.error("DeepSeek API 响应格式错误: {}", response);
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 服务响应格式错误");
             }
-            
+
             List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
             if (choices.isEmpty()) {
                 log.error("DeepSeek API 未返回任何结果");
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 服务未返回结果");
             }
-            
+
             Map<String, Object> choice = choices.get(0);
             Map<String, Object> messageResponse = (Map<String, Object>) choice.get("message");
             String content = (String) messageResponse.get("content");
-            
+
             if (content == null || content.trim().isEmpty()) {
                 log.error("DeepSeek API 返回空内容");
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 服务返回空内容");
             }
-            
+
             log.info("DeepSeek API 调用成功");
             return content;
-            
+
         } catch (RestClientException e) {
             log.error("调用 DeepSeek API 失败: {}", e.getMessage());
             if (e.getMessage().contains("UnknownHostException")) {

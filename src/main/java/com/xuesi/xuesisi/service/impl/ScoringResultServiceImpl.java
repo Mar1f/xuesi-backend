@@ -249,33 +249,8 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
             // 尝试解析AI响应
             JSONObject jsonResponse;
             try {
-                // 处理可能的 Markdown 代码块
-                String jsonStr = aiResponse;
-                
-                // 移除 Markdown 代码块标记
-                if (jsonStr.contains("```json")) {
-                    jsonStr = jsonStr.substring(jsonStr.indexOf("```json") + 7);
-                    if (jsonStr.contains("```")) {
-                        jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf("```"));
-                    }
-                }
-                jsonStr = jsonStr.trim();
-                
-                // 预处理 JSON 字符串
-                jsonStr = jsonStr.replaceAll("\\\\n\\s*", "") // 移除转义的换行符及其后的空白
-                               .replaceAll("\\s*\\\\\"\\s*", "\"") // 处理转义的引号
-                               .replaceAll("\\\\([^\"\\\\])", "$1") // 移除不必要的反斜杠
-                               .replaceAll("\"\\s*:\\s*\"", "\": \"") // 规范化键值对格式
-                               .replaceAll(",\\s*}", "}") // 处理对象末尾多余的逗号
-                               .replaceAll(",\\s*]", "]"); // 处理数组末尾多余的逗号
-                
-                // 处理特殊字符和转义序列
-                jsonStr = jsonStr.replace("\\\"", "\"")
-                               .replace("\\n", "")
-                               .replace("\\r", "")
-                               .replace("\\t", "");
-                
-                log.info("预处理后的JSON字符串: {}", jsonStr);
+                // 预处理JSON字符串
+                String jsonStr = preprocessJson(aiResponse);
                 
                 // 尝试解析JSON
                 try {
@@ -396,6 +371,40 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         fail.setQuestionBankId(questionBank.getId());
         fail.setUserId(questionBank.getUserId());
         save(fail);
+    }
+
+    /**
+     * 预处理JSON字符串
+     */
+    private String preprocessJson(String jsonStr) {
+        // 移除 Markdown 代码块标记
+        if (jsonStr.contains("```json")) {
+            jsonStr = jsonStr.substring(jsonStr.indexOf("```json") + 7);
+            if (jsonStr.contains("```")) {
+                jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf("```"));
+            }
+        }
+        jsonStr = jsonStr.trim();
+        
+        // 预处理 JSON 字符串
+        jsonStr = jsonStr.replaceAll("\\\\n\\s*", "") // 移除转义的换行符及其后的空白
+                       .replaceAll("\\s*\\\\\"\\s*", "\"") // 处理转义的引号
+                       .replaceAll("\\\\([^\"\\\\])", "$1") // 移除不必要的反斜杠
+                       .replaceAll("\"\\s*:\\s*\"", "\": \"") // 规范化键值对格式
+                       .replaceAll(",\\s*}", "}") // 处理对象末尾多余的逗号
+                       .replaceAll(",\\s*]", "]") // 处理数组末尾多余的逗号
+                       .replaceAll("\"\\s*\"", "\", \"") // 处理缺少逗号的情况
+                       .replaceAll("\\}\\s*\\{", "}, {"); // 处理对象之间缺少逗号的情况
+        
+        // 处理特殊字符和转义序列
+        jsonStr = jsonStr.replace("\\\"", "\"")
+                       .replace("\\n", "")
+                       .replace("\\r", "")
+                       .replace("\\t", "");
+        
+        log.info("预处理后的JSON字符串: {}", jsonStr);
+        
+        return jsonStr;
     }
 
 }

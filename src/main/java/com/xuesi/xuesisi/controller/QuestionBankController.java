@@ -1,11 +1,17 @@
 package com.xuesi.xuesisi.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.xuesi.xuesisi.annotation.AuthCheck;
 import com.xuesi.xuesisi.common.BaseResponse;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.common.ResultUtils;
+import com.xuesi.xuesisi.constant.UserConstant;
 import com.xuesi.xuesisi.exception.BusinessException;
+import com.xuesi.xuesisi.exception.ThrowUtils;
+import com.xuesi.xuesisi.model.dto.ReviewRequest;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.User;
+import com.xuesi.xuesisi.model.enums.ReviewStatusEnum;
 import com.xuesi.xuesisi.model.vo.QuestionBankVO;
 import com.xuesi.xuesisi.model.vo.QuestionVO;
 import com.xuesi.xuesisi.model.vo.ScoringResultVO;
@@ -15,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -31,13 +38,50 @@ public class QuestionBankController {
     private UserService userService;
 
     /**
+     * 管理员审核题库
+     */
+    @PostMapping("/review")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> doQuestionBankReview(@RequestBody ReviewRequest reviewRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(reviewRequest == null, ErrorCode.PARAMS_ERROR);
+        Long id = reviewRequest.getId();
+        Integer reviewStatus = reviewRequest.getReviewStatus();
+        // 校验
+        ReviewStatusEnum reviewStatusEnum = ReviewStatusEnum.getEnumByValue(reviewStatus);
+        if (id == null || reviewStatusEnum == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 判断是否存在
+        QuestionBank oldQuestionBank = questionBankService.getById(id);
+        ThrowUtils.throwIf(oldQuestionBank == null, ErrorCode.NOT_FOUND_ERROR);
+        // 已是该状态
+        if (oldQuestionBank.getReviewStatus().equals(reviewStatus)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请勿重复审核");
+        }
+        // 更新审核状态
+        User loginUser = userService.getLoginUser(request);
+        QuestionBank questionBank = new QuestionBank();
+        questionBank.setId(id);
+        questionBank.setReviewStatus(reviewStatus);
+        questionBank.setReviewMessage(reviewRequest.getReviewMessage());
+        questionBank.setReviewerId(loginUser.getId());
+        questionBank.setReviewTime(new Date());
+        boolean result = questionBankService.updateById(questionBank);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
      * 创建题库
      */
     @PostMapping("/create")
-    public BaseResponse<Long> createQuestionBank(@RequestBody QuestionBank questionBank) {
+    public BaseResponse<Long> createQuestionBank(@RequestBody QuestionBank questionBank, HttpServletRequest request) {
         if (questionBank == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        // 获取当前登录用户ID
+        Long userId = userService.getLoginUser(request).getId();
+        questionBank.setUserId(userId);
         Long questionBankId = questionBankService.createQuestionBank(questionBank);
         return ResultUtils.success(questionBankId);
     }
