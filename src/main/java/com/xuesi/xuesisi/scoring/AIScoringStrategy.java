@@ -7,21 +7,13 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.common.BaseResponse;
 import com.xuesi.xuesisi.exception.BusinessException;
-import com.xuesi.xuesisi.model.entity.QuestionBank;
-import com.xuesi.xuesisi.model.entity.Question;
-import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
-import com.xuesi.xuesisi.model.entity.ScoringResult;
-import com.xuesi.xuesisi.model.entity.UserAnswer;
-import com.xuesi.xuesisi.model.entity.LearningAnalysis;
-import com.xuesi.xuesisi.service.DeepSeekService;
-import com.xuesi.xuesisi.service.QuestionBankQuestionService;
-import com.xuesi.xuesisi.service.QuestionService;
-import com.xuesi.xuesisi.service.ScoringResultService;
-import com.xuesi.xuesisi.service.UserAnswerService;
-import com.xuesi.xuesisi.service.LearningAnalysisService;
+import com.xuesi.xuesisi.model.entity.*;
+import com.xuesi.xuesisi.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -54,6 +46,12 @@ public class AIScoringStrategy implements ScoringStrategy {
     @Resource
     private LearningAnalysisService learningAnalysisService;
 
+    @Resource
+    private TeachingPlanService teachingPlanService;
+    @Resource
+    private QuestionKnowledgeService questionKnowledgeService;
+    @Resource
+    private UserAnswerService userAnswerService;
     @Transactional(rollbackFor = Exception.class)
     @Retryable(value = {DataAccessException.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
     @Override
@@ -186,11 +184,45 @@ public class AIScoringStrategy implements ScoringStrategy {
         userAnswer.setResultName(finalResult.getResultName());
         userAnswer.setResultScore(totalScore); // 使用原始分数
         userAnswer.setResultDesc(finalResult.getResultDesc());
+        userAnswer.setUserAnswerId(questionBank.getUserId()); // Set the user ID
         
         // 8. 保存学习分析结果
         saveLearningAnalysis(questions, choices, aiResponse, totalScore, questionBank);
         
         log.info("AI 评分完成，得分：{}，结果：{}", totalScore, finalResult.getResultName());
+        
+        // 先保存答题记录，获取ID
+        userAnswerService.save(userAnswer);
+        
+        // 在评分完成后，生成教案
+        try {
+            log.info("开始生成教案，答题记录ID：{}", userAnswer.getId());
+            
+            // 获取错题的知识点
+            List<String> wrongQuestionKnowledgePoints = getWrongQuestionKnowledgePoints(aiResponse, questions);
+            log.info("获取到错题知识点：{}", wrongQuestionKnowledgePoints);
+
+            // 构造AI提示
+            String prompt = buildTeachingPlanPrompt(wrongQuestionKnowledgePoints, aiResponse);
+            log.info("构造的AI提示：{}", prompt);
+
+            // 调用AI生成教案
+            log.info("开始调用AI生成教案");
+            String aiTeachingPlan = deepSeekService.chat(prompt);
+            log.info("AI返回的教案：{}", aiTeachingPlan);
+
+            // 解析AI返回的教案
+            TeachingPlan teachingPlan = parseTeachingPlan(aiTeachingPlan, userAnswer.getId());
+            log.info("解析后的教案：{}", teachingPlan);
+
+            // 保存教案
+            boolean saved = teachingPlanService.save(teachingPlan);
+            log.info("教案保存{}", saved ? "成功" : "失败");
+
+        } catch (Exception e) {
+            log.error("生成教案失败", e);
+            // 这里我们不抛出异常，因为不想影响主流程
+        }
         return userAnswer;
     }
 
@@ -314,5 +346,104 @@ public class AIScoringStrategy implements ScoringStrategy {
             log.error("错误详情: {}", e.getMessage());
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "解析AI评分结果失败: " + e.getMessage());
         }
+    }
+
+    private List<String> getWrongQuestionKnowledgePoints(String aiResponse, List<Question> questions) {
+        List<String> wrongPoints = new ArrayList<>();
+        try {
+            // 移除markdown代码块标记
+            aiResponse = aiResponse.replaceAll("```json\\s*", "")
+                                 .replaceAll("```\\s*", "")
+                                 .trim();
+                                 
+            log.info("开始解析错题知识点，AI响应：{}", aiResponse);
+            JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
+            JSONArray analysis = jsonResponse.getJSONArray("analysis");
+            log.info("找到{}道题的分析", analysis.size());
+
+            for (int i = 0; i < analysis.size(); i++) {
+                JSONObject questionAnalysis = analysis.getJSONObject(i);
+                int score = questionAnalysis.getInt("score", 10); // 默认10分，表示正确
+                log.info("第{}题得分：{}", i + 1, score);
+                
+                if (score == 0) {
+                    // 获取这道题的知识点
+                    Question question = questions.get(i); // 直接从questions列表获取
+                    if (question != null && question.getTags() != null) {
+                        log.info("第{}题知识点：{}", i + 1, question.getTags());
+                        wrongPoints.addAll(question.getTags());
+                    } else {
+                        log.warn("第{}题未找到知识点", i + 1);
+                    }
+                }
+            }
+            log.info("错题知识点解析完成，找到{}个知识点", wrongPoints.size());
+        } catch (Exception e) {
+            log.error("解析错题知识点失败", e);
+        }
+        return wrongPoints;
+    }
+
+    private String buildTeachingPlanPrompt(List<String> wrongPoints, String aiResponse) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("请根据以下信息生成一份详细的教学教案：\n");
+        prompt.append("1. 学生在以下知识点表现欠佳：").append(String.join("、", wrongPoints)).append("\n");
+        prompt.append("2. 具体题目分析：").append(aiResponse).append("\n");
+        prompt.append("请生成一份包含以下内容的详细教案，以JSON格式返回：\n");
+        prompt.append("{\n");
+        prompt.append("  \"knowledgeAnalysis\": \"知识点分析和学生存在的问题\",\n");
+        prompt.append("  \"teachingDesign\": {\n");
+        prompt.append("    \"teachingObjectives\": \"教学目标\",\n");
+        prompt.append("    \"teachingArrangement\": [\n");
+        prompt.append("      {\n");
+        prompt.append("        \"stage\": \"教学阶段名称\",\n");
+        prompt.append("        \"duration\": \"时间分配（分钟）\",\n");
+        prompt.append("        \"activities\": \"具体教学活动安排\",\n");
+        prompt.append("        \"methods\": \"教学方法\",\n");
+        prompt.append("        \"materials\": \"教学材料和工具\"\n");
+        prompt.append("      }\n");
+        prompt.append("    ]\n");
+        prompt.append("  },\n");
+        prompt.append("  \"expectedOutcomes\": \"预期学习成果\",\n");
+        prompt.append("  \"evaluationMethods\": \"评估方法\"\n");
+        prompt.append("}\n");
+        prompt.append("\n请确保：\n");
+        prompt.append("1. 教学设计针对性地解决学生在这些知识点上的问题\n");
+        prompt.append("2. 教学活动安排合理，时间分配适当\n");
+        prompt.append("3. 采用多样化的教学方法，注重学生参与\n");
+        prompt.append("4. 包含具体的教学案例和练习");
+        return prompt.toString();
+    }
+
+    private TeachingPlan parseTeachingPlan(String aiTeachingPlan, Long userAnswerId) {
+        TeachingPlan plan = new TeachingPlan();
+        try {
+            // 移除markdown代码块标记
+            aiTeachingPlan = aiTeachingPlan.replaceAll("```json\\s*", "").replaceAll("```\\s*$", "").trim();
+            JSONObject json = JSONUtil.parseObj(aiTeachingPlan);
+            plan.setUserAnswerId(userAnswerId);
+            
+            // 解析并保存教案内容
+            Object knowledgeAnalysis = json.get("knowledgeAnalysis");
+            JSONObject teachingDesign = json.getJSONObject("teachingDesign");
+            Object expectedOutcomes = json.get("expectedOutcomes");
+            Object evaluationMethods = json.get("evaluationMethods");
+            
+            plan.setKnowledgeAnalysis(knowledgeAnalysis != null ? JSONUtil.toJsonStr(knowledgeAnalysis) : null);
+            if (teachingDesign != null) {
+                plan.setTeachingObjectives(teachingDesign.getStr("teachingObjectives"));
+                plan.setTeachingArrangement(JSONUtil.toJsonStr(teachingDesign.get("teachingArrangement")));
+            }
+            plan.setExpectedOutcomes(expectedOutcomes != null ? JSONUtil.toJsonStr(expectedOutcomes) : null);
+            plan.setEvaluationMethods(evaluationMethods != null ? JSONUtil.toJsonStr(evaluationMethods) : null);
+            
+            plan.setCreateTime(new Date());
+            plan.setUpdateTime(new Date());
+            plan.setIsDelete(0);
+        } catch (Exception e) {
+            log.error("解析教案失败", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "解析教案失败");
+        }
+        return plan;
     }
 } 

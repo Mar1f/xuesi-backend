@@ -38,9 +38,13 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import cn.hutool.json.JSONConfig;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import java.util.Optional;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 题库服务实现类
@@ -131,7 +135,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                 log.info("AI响应内容: {}", aiResponse);
 
                 // 预处理JSON字符串
-                String jsonStr = extractJsonContent(aiResponse);
+                String jsonStr = preprocessJson(aiResponse);
                 log.debug("提取的JSON内容: {}", jsonStr);
                 
                 jsonStr = preprocessJson(jsonStr);
@@ -142,9 +146,8 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                 
                 // 解析JSON
                 JSONObject jsonResponse = JSONUtil.parseObj(jsonStr, JSONConfig.create()
-                    .setOrder(false)
-                    .setCheckDuplicate(false)
-                    .setIgnoreCase(true));
+                    .setIgnoreCase(true)
+                    .setCheckDuplicate(false));
 
                 // 验证必要字段
                 if (!jsonResponse.containsKey("questions")) {
@@ -199,40 +202,93 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
     /**
      * JSON预处理
      */
-    private String preprocessJson(String jsonStr) {
-        // 移除 Markdown 代码块标记
-        if (jsonStr.contains("```json")) {
-            jsonStr = jsonStr.substring(jsonStr.indexOf("```json") + 7);
-            if (jsonStr.contains("```")) {
-                jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf("```"));
-            }
+    private String preprocessJson(String aiResponse) {
+        if (StringUtils.isBlank(aiResponse)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "AI响应为空");
         }
-        jsonStr = jsonStr.trim();
         
-        // 预处理 JSON 字符串
-        jsonStr = jsonStr.replaceAll("\\\\n\\s*", "") // 移除转义的换行符及其后的空白
-                       .replaceAll("\\s*\\\\\"\\s*", "\"") // 处理转义的引号
-                       .replaceAll("\\\\([^\"\\\\])", "$1") // 移除不必要的反斜杠
-                       .replaceAll("\"\\s*:\\s*\"", "\": \"") // 规范化键值对格式
-                       .replaceAll(",\\s*}", "}") // 处理对象末尾多余的逗号
-                       .replaceAll(",\\s*]", "]"); // 处理数组末尾多余的逗号
+        log.info("AI响应内容: {}", aiResponse);
         
-        // 处理特殊字符和转义序列
-        jsonStr = jsonStr.replace("\\\"", "\"")
-                       .replace("\\n", "")
-                       .replace("\\r", "")
-                       .replace("\\t", "");
-        
-        // 处理 LaTeX 公式中的反斜杠
-        jsonStr = jsonStr.replace("\\(", "\\\\(")
-                       .replace("\\)", "\\\\)")
-                       .replace("\\frac", "\\\\frac")
-                       .replace("\\sqrt", "\\\\sqrt")
-                       .replace("\\neq", "\\\\neq");
-        
-        log.info("预处理后的JSON字符串: {}", jsonStr);
-        
-        return jsonStr;
+        try {
+            // 1. 移除markdown代码块标记
+            aiResponse = aiResponse.replaceAll("```json\\s*", "")
+                                 .replaceAll("\\s*```", "")
+                                 .trim();
+                                 
+            // 2. 替换LaTeX表达式
+            // 先处理行内LaTeX
+            aiResponse = aiResponse.replaceAll("\\\\\\((.*?)\\\\\\)", "($1)")
+                                 .replaceAll("\\\\\\[(.*?)\\\\\\]", "[$1]");
+                                 
+            // 3. 替换特殊的LaTeX命令
+            aiResponse = aiResponse.replaceAll("\\\\begin\\{cases\\}", "[")
+                                 .replaceAll("\\\\end\\{cases\\}", "]")
+                                 .replaceAll("\\\\\\\\", "\\\\")  // 处理换行
+                                 .replaceAll("\\\\frac\\{([^}]*)\\}\\{([^}]*)\\}", "frac{$1}{$2}")
+                                 .replaceAll("\\\\sqrt\\{([^}]*)\\}", "sqrt{$1}")
+                                 .replaceAll("\\\\times", "times")
+                                 .replaceAll("\\\\left", "")
+                                 .replaceAll("\\\\right", "");
+                                 
+            // 4. 处理选项数组格式
+            Pattern arrayPattern = Pattern.compile("\"options\":\\s*\\[(.*?)\\]");
+            Matcher arrayMatcher = arrayPattern.matcher(aiResponse);
+            StringBuffer sb = new StringBuffer();
+            while (arrayMatcher.find()) {
+                String options = arrayMatcher.group(1);
+                // 如果选项本身是数组，保持原样
+                if (options.contains("[") && options.contains("]")) {
+                    continue;
+                }
+                
+                // 处理坐标对选项的特殊情况
+                if (options.contains(",") && options.contains("(") && options.contains(")")) {
+                    String[] rawOptions = options.split(",(?=\\s*[\"\\(])");
+                    List<String> formattedOptions = new ArrayList<>();
+                    for (String option : rawOptions) {
+                        option = option.trim();
+                        if (!option.startsWith("\"")) {
+                            option = "\"" + option;
+                        }
+                        if (!option.endsWith("\"")) {
+                            option = option + "\"";
+                        }
+                        formattedOptions.add(option);
+                    }
+                    String replacement = "\"options\": [" + String.join(",", formattedOptions) + "]";
+                    arrayMatcher.appendReplacement(sb, replacement);
+                    continue;
+                }
+                
+                // 处理普通选项
+                String[] optionArray = options.split(",");
+                List<String> formattedOptions = new ArrayList<>();
+                for (String option : optionArray) {
+                    option = option.trim();
+                    if (!option.startsWith("\"")) {
+                        option = "\"" + option;
+                    }
+                    if (!option.endsWith("\"")) {
+                        option = option + "\"";
+                    }
+                    formattedOptions.add(option);
+                }
+                String replacement = "\"options\": [" + String.join(",", formattedOptions) + "]";
+                arrayMatcher.appendReplacement(sb, replacement);
+            }
+            arrayMatcher.appendTail(sb);
+            aiResponse = sb.toString();
+            
+            log.info("预处理后的JSON字符串: {}", aiResponse);
+            
+            // 5. 验证JSON结构
+            JSONObject jsonObject = JSONUtil.parseObj(aiResponse);
+            return aiResponse;
+            
+        } catch (Exception e) {
+            log.error("JSON结构验证失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "JSON格式错误: " + e.getMessage());
+        }
     }
 
     /**
@@ -314,7 +370,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                     List<String> tagList = new ArrayList<>();
                     for (int j = 0; j < tags.size(); j++) {
                         String tag = tags.getStr(j);
-                        if (StringUtils.hasText(tag)) {
+                        if (StringUtils.isNotBlank(tag)) {
                             tagList.add(tag);
                         }
                     }

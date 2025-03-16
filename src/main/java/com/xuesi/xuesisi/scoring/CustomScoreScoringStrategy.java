@@ -139,6 +139,7 @@ public class CustomScoreScoringStrategy implements ScoringStrategy {
         userAnswer.setResultName(finalResult.getResultName());
         userAnswer.setResultScore(totalScore);
         userAnswer.setResultDesc(finalResult.getResultDesc()); // 添加评分描述
+        userAnswer.setUserAnswerId(questionBank.getUserId()); // Set the user ID
         
         return userAnswer;
     }

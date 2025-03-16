@@ -220,3 +220,31 @@ CREATE TABLE IF NOT EXISTS `knowledge_point` (
     INDEX `idx_subject` (`subject`)
     ) COMMENT '知识点表' COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE `teaching_plan` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `userAnswerId` bigint NOT NULL COMMENT '答题记录ID',
+    `classId` bigint DEFAULT NULL COMMENT '班级ID',
+    `knowledgeAnalysis` text COMMENT '知识点分析',
+    `teachingSuggestions` text COMMENT '教学建议',
+    `keyPoints` text COMMENT '教学重点',
+    `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `isDelete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_userAnswerId` (`userAnswerId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教案表';
+use xuesisi;
+-- 更新教案表结构
+ALTER TABLE `teaching_plan`
+    -- 删除旧字段
+    DROP COLUMN `teachingSuggestions`,
+    DROP COLUMN `keyPoints`,
+
+    -- 修改知识点分析字段描述
+    MODIFY COLUMN `knowledgeAnalysis` text COMMENT '知识点分析和学生存在的问题',
+
+    -- 添加新字段
+    ADD COLUMN `teachingObjectives` text COMMENT '教学目标' AFTER `knowledgeAnalysis`,
+    ADD COLUMN `teachingArrangement` text COMMENT '教学活动安排（JSON数组，包含教学阶段、时间分配、活动安排等）' AFTER `teachingObjectives`,
+    ADD COLUMN `expectedOutcomes` text COMMENT '预期学习成果' AFTER `teachingArrangement`,
+    ADD COLUMN `evaluationMethods` text COMMENT '评估方法' AFTER `expectedOutcomes`;
