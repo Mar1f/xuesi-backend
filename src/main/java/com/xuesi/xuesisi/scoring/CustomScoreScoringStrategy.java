@@ -104,29 +104,57 @@ public class CustomScoreScoringStrategy implements ScoringStrategy {
             questionIndex++;
         }
 
-        // 3. 获取评分结果（按分数降序排序）
+        // 3. 获取题库所有评分结果
         List<ScoringResult> scoringResultList = scoringResultService.list(
             Wrappers.lambdaQuery(ScoringResult.class)
                 .eq(ScoringResult::getQuestionBankId, questionBankId)
-                .orderByDesc(ScoringResult::getResultScoreRange)
+                .eq(ScoringResult::getIsDynamic, 0) // 只获取预设的结果
+                .orderByAsc(ScoringResult::getId) // 按ID升序排序
         );
         
         if (scoringResultList.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "评分结果不存在，请先配置评分结果");
         }
 
-        // 4. 根据得分范围确定最终结果
+        // 4. 根据得分确定最终结果
         ScoringResult finalResult = null;
-        for (ScoringResult scoringResult : scoringResultList) {
-            if (totalScore >= scoringResult.getResultScoreRange()) {
-                finalResult = scoringResult;
-                break;
-            }
+        
+        // 基于分数范围映射到不同等级结果
+        if (totalScore >= 90) {
+            // 查找"优秀"结果
+            finalResult = scoringResultList.stream()
+                .filter(r -> "优秀".equals(r.getResultName()))
+                .findFirst()
+                .orElse(null);
+        } else if (totalScore >= 80) {
+            // 查找"良好"结果
+            finalResult = scoringResultList.stream()
+                .filter(r -> "良好".equals(r.getResultName()))
+                .findFirst()
+                .orElse(null);
+        } else if (totalScore >= 70) {
+            // 查找"中等"结果
+            finalResult = scoringResultList.stream()
+                .filter(r -> "中等".equals(r.getResultName()))
+                .findFirst()
+                .orElse(null);
+        } else if (totalScore >= 60) {
+            // 查找"及格"结果
+            finalResult = scoringResultList.stream()
+                .filter(r -> "及格".equals(r.getResultName()))
+                .findFirst()
+                .orElse(null);
+        } else {
+            // 查找"不及格"结果
+            finalResult = scoringResultList.stream()
+                .filter(r -> "不及格".equals(r.getResultName()))
+                .findFirst()
+                .orElse(null);
         }
         
-        // 如果没有找到匹配的结果，使用最低档的结果
+        // 如果没有找到匹配的结果，使用第一个结果
         if (finalResult == null && !scoringResultList.isEmpty()) {
-            finalResult = scoringResultList.get(scoringResultList.size() - 1);
+            finalResult = scoringResultList.get(0);
         }
 
         // 5. 构造返回值，填充答案对象的属性

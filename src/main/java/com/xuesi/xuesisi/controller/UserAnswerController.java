@@ -1,6 +1,7 @@
 package com.xuesi.xuesisi.controller;
 
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
 import com.xuesi.xuesisi.service.QuestionBankService;
@@ -17,12 +18,14 @@ import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerEditRequest;
 import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerQueryRequest;
 import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerUpdateRequest;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.ScoringResult;
 import com.xuesi.xuesisi.model.entity.User;
 import com.xuesi.xuesisi.model.entity.UserAnswer;
 import com.xuesi.xuesisi.model.enums.ReviewStatusEnum;
 import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 import com.xuesi.xuesisi.scoring.ScoringStrategyExecutor;
 import com.xuesi.xuesisi.service.QuestionBankService;
+import com.xuesi.xuesisi.service.ScoringResultService;
 import com.xuesi.xuesisi.service.UserAnswerService;
 import com.xuesi.xuesisi.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +58,9 @@ public class UserAnswerController {
     @Resource
     private ScoringStrategyExecutor scoringStrategyExecutor;
 
+    @Resource
+    private ScoringResultService scoringResultService;
+
     // region 增删改查
 
     /**
@@ -78,7 +84,7 @@ public class UserAnswerController {
         userAnswer.setChoices(JSONUtil.toJsonStr(userAnswerAddRequest.getChoices()));
         // 数据校验
         userAnswerService.validUserAnswer(userAnswer, true);
-        // 判断  是否存在
+        // 判断题库是否存在
         log.info("收到的请求: {}", userAnswerAddRequest);
         log.info("解析出的 questionBankId: {}", userAnswerAddRequest.getQuestionBankId());
 
@@ -98,31 +104,45 @@ public class UserAnswerController {
         userAnswer.setScoringStrategy(questionBank.getScoringStrategy()); // 设置评分策略
         userAnswer.setQuestionBankType(questionBank.getQuestionBankType()); // 设置题库类型
         
+        // 从choices中提取答案列表
+        List<String> answerList = userAnswerAddRequest.getChoices().stream()
+                .map(choice -> String.join(",", choice.getAnswer()))
+                .collect(Collectors.toList());
+        
+        // 执行评分
+        try {
+            UserAnswer scoredAnswer = scoringStrategyExecutor.doScore(answerList, questionBank);
+            // 复制评分结果到原始答案对象
+            userAnswer.setResultId(scoredAnswer.getResultId());
+            userAnswer.setResultName(scoredAnswer.getResultName());
+            userAnswer.setResultDesc(scoredAnswer.getResultDesc());
+            userAnswer.setResultScore(scoredAnswer.getResultScore());
+        } catch (Exception e) {
+            log.error("评分失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "评分失败：" + e.getMessage());
+        }
+        
+        // 更新评分结果
+        ScoringResult scoringResult = scoringResultService.getOne(
+            new LambdaQueryWrapper<ScoringResult>()
+                .eq(ScoringResult::getQuestionBankId, questionBankId)
+                .eq(ScoringResult::getUserId, loginUser.getId())
+                .orderByDesc(ScoringResult::getCreateTime)
+                .last("LIMIT 1")
+        );
+        
+        if (scoringResult != null) {
+            scoringResult.setDuration(userAnswerAddRequest.getDuration());
+            scoringResult.setScore(userAnswer.getResultScore()); // 设置最终得分
+            scoringResult.setStatus(1); // 设置为已完成
+            scoringResultService.updateById(scoringResult);
+        }
+
         // 写入数据库
         boolean result = userAnswerService.save(userAnswer);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        // 返回新写入的数据 id
-        long newUserAnswerId = userAnswer.getId();
-        // 调用评分模块
-        try {
-            // 从choices中提取答案列表
-            List<String> answerList = userAnswerAddRequest.getChoices().stream()
-                    .map(choice -> String.join(",", choice.getAnswer()))
-                    .collect(Collectors.toList());
-            log.info("开始评分，答案列表: {}", answerList);
-            UserAnswer userAnswerWithResult = scoringStrategyExecutor.doScore(answerList, questionBank);
-            log.info("评分完成，结果: {}", userAnswerWithResult);
-            userAnswerWithResult.setId(newUserAnswerId);
-            userAnswerService.updateById(userAnswerWithResult);
-            
-            // 获取完整的评分结果并返回
-            UserAnswer updatedAnswer = userAnswerService.getById(newUserAnswerId);
-            UserAnswerVO userAnswerVO = userAnswerService.getUserAnswerVO(updatedAnswer, request);
-            return ResultUtils.success(userAnswerVO);
-        } catch (Exception e) {
-            log.error("评分出错", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "评分错误: " + e.getMessage());
-        }
+        // 返回
+        return ResultUtils.success(userAnswerService.getUserAnswerVO(userAnswer, request));
     }
 
     /**

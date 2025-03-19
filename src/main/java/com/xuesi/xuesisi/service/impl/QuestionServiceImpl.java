@@ -10,11 +10,15 @@ import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
 import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.QuestionService;
 import com.xuesi.xuesisi.mapper.QuestionMapper;
+import com.xuesi.xuesisi.service.QuestionKnowledgeService;
+import com.xuesi.xuesisi.service.KnowledgePointService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.xuesi.xuesisi.model.entity.KnowledgePoint;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,6 +33,15 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
     @Resource
     private QuestionBankQuestionService questionBankQuestionService;
+
+    @Resource
+    private QuestionMapper questionMapper;
+    
+    @Resource
+    private QuestionKnowledgeService questionKnowledgeService;
+    
+    @Resource
+    private KnowledgePointService knowledgePointService;
 
     @Override
     public Question createQuestion(Question question) {
@@ -132,6 +145,52 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         }
 
         return question;
+    }
+
+    /**
+     * 获取题目的知识点列表
+     */
+    public List<KnowledgePoint> getQuestionKnowledgePoints(Long questionId) {
+        if (questionId == null) {
+            return Collections.emptyList();
+        }
+        return questionKnowledgeService.getKnowledgePointsByQuestionId(questionId);
+    }
+    
+    /**
+     * 为题目设置知识点
+     * @param questionId 题目ID
+     * @param knowledgeNames 知识点名称列表
+     * @param subject 学科
+     * @param userId 用户ID
+     * @return 关联成功的知识点数量
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int setQuestionKnowledgePoints(Long questionId, List<String> knowledgeNames, String subject, Long userId) {
+        if (questionId == null || knowledgeNames == null || knowledgeNames.isEmpty()) {
+            return 0;
+        }
+        
+        try {
+            // 先清除现有关联
+            questionKnowledgeService.removeAllKnowledgeFromQuestion(questionId);
+            
+            // 获取或创建知识点
+            List<Long> knowledgeIds = knowledgePointService.getOrCreateKnowledgePoints(
+                knowledgeNames, subject, userId);
+                
+            if (knowledgeIds.isEmpty()) {
+                return 0;
+            }
+            
+            // 建立新关联
+            questionKnowledgeService.batchAddKnowledgeToQuestion(questionId, knowledgeIds);
+            
+            return knowledgeIds.size();
+        } catch (Exception e) {
+            log.error("设置题目知识点失败: questionId={}, error={}", questionId, e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "设置知识点失败: " + e.getMessage());
+        }
     }
 }
 

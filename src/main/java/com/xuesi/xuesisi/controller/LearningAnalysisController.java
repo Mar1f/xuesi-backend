@@ -1,5 +1,9 @@
 package com.xuesi.xuesisi.controller;
 
+import com.xuesi.xuesisi.common.BaseResponse;
+import com.xuesi.xuesisi.common.ErrorCode;
+import com.xuesi.xuesisi.common.ResultUtils;
+import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.entity.LearningAnalysis;
 import com.xuesi.xuesisi.service.LearningAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,5 +58,20 @@ public class LearningAnalysisController {
     public ResponseEntity<Void> deleteLearningAnalysis(@PathVariable Long userId, @PathVariable Long classId) {
         learningAnalysisService.deleteLearningAnalysis(userId, classId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 获取个性化学习建议
+     *
+     * @param id 学习分析ID
+     * @return 个性化学习建议
+     */
+    @GetMapping("/suggestion/{id}")
+    public BaseResponse<String> getPersonalizedSuggestion(@PathVariable Long id) {
+        if (id == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        String suggestion = learningAnalysisService.generatePersonalizedSuggestions(id);
+        return ResultUtils.success(suggestion);
     }
 }

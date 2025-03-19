@@ -1,16 +1,14 @@
 package com.xuesi.xuesisi.mapper;
 
-import com.xuesi.xuesisi.model.entity.KnowledgePoint;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xuesi.xuesisi.model.entity.KnowledgePoint;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
-* @author mar1
-* @description 针对表【knowledge_point(知识点表)】的数据库操作Mapper
-* @createDate 2025-03-02 15:47:32
-* @Entity com.xuesi.xuesisi.model.entity.KnowledgePoint
-*/
+ * KnowledgePoint Mapper
+ */
+@Mapper
 public interface KnowledgePointMapper extends BaseMapper<KnowledgePoint> {
-
 }
 
 

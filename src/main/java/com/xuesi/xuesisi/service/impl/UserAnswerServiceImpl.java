@@ -9,12 +9,10 @@ import com.xuesi.xuesisi.constant.CommonConstant;
 import com.xuesi.xuesisi.exception.ThrowUtils;
 import com.xuesi.xuesisi.mapper.UserAnswerMapper;
 import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerQueryRequest;
-import com.xuesi.xuesisi.model.entity.QuestionBank;
 import com.xuesi.xuesisi.model.entity.User;
 import com.xuesi.xuesisi.model.entity.UserAnswer;
 import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 import com.xuesi.xuesisi.model.vo.UserVO;
-import com.xuesi.xuesisi.service.QuestionBankService;
 import com.xuesi.xuesisi.service.UserAnswerService;
 import com.xuesi.xuesisi.service.UserService;
 import com.xuesi.xuesisi.utils.SqlUtils;
@@ -47,9 +45,6 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
     @Resource
     private UserService userService;
 
-    @Resource
-    private QuestionBankService questionBankService;
-
     /**
      * 校验数据
      *
@@ -72,11 +67,6 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
             ThrowUtils.throwIf(questionBankId == null || questionBankId <= 0, ErrorCode.PARAMS_ERROR, "questionBankId 非法");
             ThrowUtils.throwIf(StringUtils.isBlank(choices), ErrorCode.PARAMS_ERROR, "答案列表不能为空");
         }
-        // 修改数据时，有参数则校验
-        if (questionBankId != null) {
-            QuestionBank questionBank = questionBankService.getById(questionBankId);
-            ThrowUtils.throwIf(questionBank == null, ErrorCode.PARAMS_ERROR, "应用不存在");
-        }
     }
 
 
@@ -88,39 +78,23 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
      */
     @Override
     public QueryWrapper<UserAnswer> getQueryWrapper(UserAnswerQueryRequest userAnswerQueryRequest) {
-        QueryWrapper<UserAnswer> queryWrapper = new QueryWrapper<>();
         if (userAnswerQueryRequest == null) {
-            return queryWrapper;
+            throw new com.xuesi.xuesisi.exception.BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
         }
-        // 从对象中取值
+
         Long id = userAnswerQueryRequest.getId();
+        Long notId = userAnswerQueryRequest.getNotId();
+        String searchText = userAnswerQueryRequest.getSearchText();
         Long questionBankId = userAnswerQueryRequest.getQuestionBankId();
         Integer QuestionBankType = userAnswerQueryRequest.getQuestionBankType();
         Integer scoringStrategy = userAnswerQueryRequest.getScoringStrategy();
-        String choices = userAnswerQueryRequest.getChoices();
         Long resultId = userAnswerQueryRequest.getResultId();
-//        String resultName = userAnswerQueryRequest.getResultName();
-        String resultDesc = userAnswerQueryRequest.getResultDesc();
-//        String resultPicture = userAnswerQueryRequest.getResultPicture();
         Integer resultScore = userAnswerQueryRequest.getResultScore();
         Long userId = userAnswerQueryRequest.getUserId();
-        Long notId = userAnswerQueryRequest.getNotId();
-        String searchText = userAnswerQueryRequest.getSearchText();
         String sortField = userAnswerQueryRequest.getSortField();
         String sortOrder = userAnswerQueryRequest.getSortOrder();
 
-        // 补充需要的查询条件
-        // 从多字段中搜索
-        if (StringUtils.isNotBlank(searchText)) {
-            // 需要拼接查询条件
-            queryWrapper.and(qw -> qw.like("resultName", searchText).or().like("resultDesc", searchText));
-        }
-        // 模糊查询
-        queryWrapper.like(StringUtils.isNotBlank(choices), "choices", choices);
-//        queryWrapper.like(StringUtils.isNotBlank(resultName), "resultName", resultName);
-        queryWrapper.like(StringUtils.isNotBlank(resultDesc), "resultDesc", resultDesc);
-//        queryWrapper.like(StringUtils.isNotBlank(resultPicture), "resultPicture", resultPicture);
-        // 精确查询
+        QueryWrapper<UserAnswer> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(ObjectUtils.isNotEmpty(notId), "id", notId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
         queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
@@ -177,28 +151,21 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
         if (CollUtil.isEmpty(userAnswerList)) {
             return userAnswerVOPage;
         }
-        // 对象列表 => 封装对象列表
-        List<UserAnswerVO> userAnswerVOList = userAnswerList.stream().map(userAnswer -> {
-            return UserAnswerVO.objToVo(userAnswer);
-        }).collect(Collectors.toList());
-
-        // 可以根据需要为封装对象补充值，不需要的内容可以删除
-        // region 可选
         // 1. 关联查询用户信息
         Set<Long> userIdSet = userAnswerList.stream().map(UserAnswer::getUserAnswerId).collect(Collectors.toSet());
         Map<Long, List<User>> userIdUserListMap = userService.listByIds(userIdSet).stream()
                 .collect(Collectors.groupingBy(User::getId));
         // 填充信息
-        userAnswerVOList.forEach(userAnswerVO -> {
-            Long userId = userAnswerVO.getUserId();
+        List<UserAnswerVO> userAnswerVOList = userAnswerList.stream().map(userAnswer -> {
+            UserAnswerVO userAnswerVO = getUserAnswerVO(userAnswer, request);
+            Long userId = userAnswer.getUserAnswerId();
             User user = null;
             if (userIdUserListMap.containsKey(userId)) {
                 user = userIdUserListMap.get(userId).get(0);
             }
             userAnswerVO.setUser(userService.getUserVO(user));
-        });
-        // endregion
-
+            return userAnswerVO;
+        }).collect(Collectors.toList());
         userAnswerVOPage.setRecords(userAnswerVOList);
         return userAnswerVOPage;
     }

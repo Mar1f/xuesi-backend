@@ -1,8 +1,6 @@
 package com.xuesi.xuesisi.model.vo;
 
 import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.xuesi.xuesisi.model.dto.question.QuestionContentDTO;
 import com.xuesi.xuesisi.model.entity.Question;
 import lombok.Data;
@@ -30,7 +28,7 @@ public class QuestionVO implements Serializable {
     /**
      * 题目类型
      */
-    private Integer type;
+    private Integer questionType;
 
     /**
      * 选项列表
@@ -40,7 +38,7 @@ public class QuestionVO implements Serializable {
     /**
      * 答案
      */
-    private List<String> answers;
+    private List<String> answer;
 
     /**
      * 解析
@@ -60,12 +58,7 @@ public class QuestionVO implements Serializable {
     /**
      * 创建者ID
      */
-    private Long creatorId;
-
-    /**
-     * 创建者名称
-     */
-    private String creatorName;
+    private Long userId;
 
     /**
      * 创建时间
@@ -80,32 +73,20 @@ public class QuestionVO implements Serializable {
     /**
      * 是否删除
      */
-    private Boolean isDelete;
+    private Integer isDelete;
 
     /**
-     * 题目内容列表
+     * 题目顺序
      */
-    private List<QuestionContentDTO> questionContent;
+    private Integer questionOrder;
 
     /**
-     * 获取题目内容列表
+     * 参考答案（用于简答题）
      */
-    public List<QuestionContentDTO> getQuestionContent() {
-        return questionContent;
-    }
-
-    /**
-     * 设置题目内容列表
-     */
-    public void setQuestionContent(List<QuestionContentDTO> questionContent) {
-        this.questionContent = questionContent;
-    }
+    private String referenceAnswer;
 
     /**
      * 封装类转对象
-     *
-     * @param questionVO
-     * @return
      */
     public static Question voToObj(QuestionVO questionVO) {
         if (questionVO == null) {
@@ -113,16 +94,12 @@ public class QuestionVO implements Serializable {
         }
         Question question = new Question();
         BeanUtils.copyProperties(questionVO, question);
-        List<QuestionContentDTO> questionContentDTO = questionVO.getQuestionContent();
-        question.setQuestionContent(JSONUtil.toJsonStr(questionContentDTO));
+        question.setQuestionContent(questionVO.getContent());
         return question;
     }
 
     /**
      * 对象转封装类
-     *
-     * @param question
-     * @return
      */
     public static QuestionVO objToVo(Question question) {
         if (question == null) {
@@ -130,10 +107,10 @@ public class QuestionVO implements Serializable {
         }
         QuestionVO questionVO = new QuestionVO();
         BeanUtils.copyProperties(question, questionVO);
-        String questionContent = question.getQuestionContent();
-        if (questionContent != null) {
-            questionVO.setQuestionContent(JSONUtil.toList(questionContent, QuestionContentDTO.class));
-        }
+        questionVO.setContent(question.getQuestionContent());
+        questionVO.setTags(JSONUtil.toList(question.getTagsStr(), String.class));
+        questionVO.setOptions(question.getOptions());
+        questionVO.setAnswer(question.getAnswer());
         return questionVO;
     }
 }

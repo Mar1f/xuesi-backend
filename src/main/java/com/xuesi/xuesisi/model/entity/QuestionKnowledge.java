@@ -32,7 +32,7 @@ public class QuestionKnowledge implements Serializable {
     private Long knowledgeId;
 
     /**
-     * 
+     * 创建时间
      */
     private Date createTime;
 

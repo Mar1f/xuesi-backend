@@ -40,6 +40,12 @@ public class Question implements Serializable {
     private List<String> tags;
 
     /**
+     * 关联的知识点列表
+     */
+    @TableField(exist = false)
+    private List<KnowledgePoint> knowledgePoints;
+
+    /**
      * 题型: 0-单选, 1-多选, 2-填空
      */
     private Integer questionType;
@@ -76,6 +82,11 @@ public class Question implements Serializable {
      * 题目解析
      */
     private String analysis;
+
+    /**
+     * 参考答案（用于简答题）
+     */
+    private String referenceAnswer;
 
     /**
      * 创建人ID

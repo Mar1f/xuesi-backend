@@ -8,10 +8,12 @@
             <id property="id" column="id" jdbcType="BIGINT"/>
             <result property="resultName" column="resultName" jdbcType="VARCHAR"/>
             <result property="resultDesc" column="resultDesc" jdbcType="VARCHAR"/>
-            <result property="resultScoreRange" column="resultScoreRange" jdbcType="VARCHAR"/>
             <result property="isDynamic" column="isDynamic" jdbcType="TINYINT"/>
-            <result property="questionbankId" column="questionbankId" jdbcType="BIGINT"/>
+            <result property="questionBankId" column="questionBankId" jdbcType="BIGINT"/>
             <result property="userId" column="userId" jdbcType="BIGINT"/>
+            <result property="score" column="score" jdbcType="INTEGER"/>
+            <result property="duration" column="duration" jdbcType="INTEGER"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
             <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
             <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
@@ -19,8 +21,8 @@
 
     <sql id="Base_Column_List">
         id,resultName,resultDesc,
-        resultScoreRange,isDynamic,questionbankId,
-        userId,createTime,updateTime,
-        isDelete
+        isDynamic,questionBankId,
+        userId,score,duration,status,
+        createTime,updateTime,isDelete
     </sql>
 </mapper>

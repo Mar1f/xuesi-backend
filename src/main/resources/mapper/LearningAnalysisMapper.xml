@@ -5,19 +5,38 @@
 <mapper namespace="com.xuesi.xuesisi.mapper.LearningAnalysisMapper">
 
     <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.LearningAnalysis">
-        <!-- 复合主键：使用两个 <id> 标签 -->
-        <id property="userId" column="userId" jdbcType="BIGINT"/>
-        <id property="classId" column="classId" jdbcType="BIGINT"/>
-        <result property="totalScore" column="totalScore" jdbcType="INTEGER"/>
-        <result property="avgScore" column="avgScore" jdbcType="DECIMAL"/>
-        <result property="weakTags" column="weakTags" jdbcType="VARCHAR"/>
-        <result property="tagStats" column="tagStats" jdbcType="VARCHAR"/>
-        <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="userId" column="user_id" jdbcType="BIGINT"/>
+        <result property="classId" column="class_id" jdbcType="BIGINT"/>
+        <result property="questionBankId" column="question_bank_id" jdbcType="BIGINT"/>
+        <result property="questionId" column="question_id" jdbcType="BIGINT"/>
+        <result property="userAnswer" column="user_answer" jdbcType="VARCHAR"/>
+        <result property="totalScore" column="total_score" jdbcType="INTEGER"/>
+        <result property="weakTags" column="weak_tags" jdbcType="VARCHAR"/>
+        <result property="tagStats" column="tag_stats" jdbcType="VARCHAR"/>
+        <result property="analysis" column="analysis" jdbcType="VARCHAR"/>
+        <result property="suggestion" column="suggestion" jdbcType="VARCHAR"/>
+        <result property="isOverall" column="is_overall" jdbcType="BOOLEAN"/>
+        <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+        <result property="isDelete" column="is_delete" jdbcType="INTEGER"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        userId,classId,totalScore,
-        avgScore,weakTags,tagStats,
-        createTime
+        id,
+        user_id,
+        class_id,
+        question_bank_id,
+        question_id,
+        user_answer,
+        total_score,
+        weak_tags,
+        tag_stats,
+        analysis,
+        suggestion,
+        is_overall,
+        create_time,
+        update_time,
+        is_delete
     </sql>
 </mapper>

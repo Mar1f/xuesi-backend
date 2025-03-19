@@ -23,6 +23,11 @@ public class UserAnswerAddRequest implements Serializable {
      */
     private List<QuestionAnswer> choices;
 
+    /**
+     * 答题用时（秒）
+     */
+    private Integer duration;
+
     @Data
     public static class QuestionAnswer {
         /**

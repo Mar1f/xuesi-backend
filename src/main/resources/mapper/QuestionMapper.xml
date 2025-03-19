@@ -14,6 +14,7 @@
             <result property="score" column="score" jdbcType="INTEGER"/>
             <result property="source" column="source" jdbcType="TINYINT"/>
             <result property="analysis" column="analysis" jdbcType="VARCHAR"/>
+            <result property="referenceAnswer" column="referenceAnswer" jdbcType="VARCHAR"/>
             <result property="userId" column="userId" jdbcType="BIGINT"/>
             <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
@@ -23,7 +24,7 @@
     <sql id="Base_Column_List">
         id,questionContent,tags,
         questionType,options,answer,
-        score,source,analysis,
+        score,source,analysis,referenceAnswer,
         userId,createTime,updateTime,isDelete
     </sql>
     
@@ -31,11 +32,11 @@
         INSERT INTO question (
             questionContent, tags, questionType,
             options, answer, score,
-            source, analysis, userId
+            source, analysis, referenceAnswer, userId
         ) VALUES (
             #{questionContent}, #{tagsStr}, #{questionType},
             #{optionsStr}, #{answerStr}, #{score},
-            #{source}, #{analysis}, #{userId}
+            #{source}, #{analysis}, #{referenceAnswer}, #{userId}
         )
     </insert>
 </mapper>

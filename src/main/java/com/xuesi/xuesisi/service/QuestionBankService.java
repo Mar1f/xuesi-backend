@@ -3,8 +3,6 @@ package com.xuesi.xuesisi.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
-import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
-import com.xuesi.xuesisi.model.entity.ScoringResult;
 import com.xuesi.xuesisi.model.vo.QuestionBankVO;
 import com.xuesi.xuesisi.model.vo.QuestionVO;
 import com.xuesi.xuesisi.model.vo.ScoringResultVO;
@@ -82,25 +80,6 @@ public interface QuestionBankService extends IService<QuestionBank> {
      * @return 题目列表
      */
     List<QuestionVO> getQuestionsByBankId(Long questionBankId);
-
-    /**
-     * 初始化评分结果
-     *
-     * @param questionBankId 题库ID
-     * @param userId        用户ID
-     * @return 评分结果
-     */
-    ScoringResultVO initializeScoringResult(Long questionBankId, Long userId);
-
-    /**
-     * 提交答案并评分
-     *
-     * @param questionBankId 题库ID
-     * @param userId        用户ID
-     * @param answers      答案列表
-     * @return 评分结果
-     */
-    ScoringResultVO submitAnswers(Long questionBankId, Long userId, List<String> answers);
 
     /**
      * 获取用户的评分历史

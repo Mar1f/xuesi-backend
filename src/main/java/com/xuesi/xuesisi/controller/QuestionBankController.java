@@ -9,14 +9,16 @@ import com.xuesi.xuesisi.constant.UserConstant;
 import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.exception.ThrowUtils;
 import com.xuesi.xuesisi.model.dto.ReviewRequest;
+import com.xuesi.xuesisi.model.dto.questionbank.*;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.TeachingPlan;
 import com.xuesi.xuesisi.model.entity.User;
 import com.xuesi.xuesisi.model.enums.ReviewStatusEnum;
 import com.xuesi.xuesisi.model.vo.QuestionBankVO;
 import com.xuesi.xuesisi.model.vo.QuestionVO;
 import com.xuesi.xuesisi.model.vo.ScoringResultVO;
-import com.xuesi.xuesisi.service.QuestionBankService;
-import com.xuesi.xuesisi.service.UserService;
+import com.xuesi.xuesisi.service.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -28,7 +30,8 @@ import java.util.List;
  * 题库接口
  */
 @RestController
-@RequestMapping("/questionBank")
+@RequestMapping("/api/question-bank")
+@Slf4j
 public class QuestionBankController {
 
     @Resource
@@ -36,6 +39,9 @@ public class QuestionBankController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private TeachingPlanService teachingPlanService;
 
     /**
      * 管理员审核题库
@@ -79,11 +85,26 @@ public class QuestionBankController {
         if (questionBank == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        
+        // 校验必要参数
+        if (questionBank.getTitle() == null || questionBank.getTitle().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "题库标题不能为空");
+        }
+        
         // 获取当前登录用户ID
         Long userId = userService.getLoginUser(request).getId();
         questionBank.setUserId(userId);
-        Long questionBankId = questionBankService.createQuestionBank(questionBank);
-        return ResultUtils.success(questionBankId);
+        
+        try {
+            Long questionBankId = questionBankService.createQuestionBank(questionBank);
+            return ResultUtils.success(questionBankId);
+        } catch (BusinessException e) {
+            log.error("创建题库失败: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("创建题库发生未知错误", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "创建题库失败：系统错误");
+        }
     }
 
     /**
@@ -183,37 +204,6 @@ public class QuestionBankController {
         }
         List<QuestionVO> questions = questionBankService.getQuestionsByBankId(questionBankId);
         return ResultUtils.success(questions);
-    }
-
-    /**
-     * 初始化评分结果
-     */
-    @PostMapping("/initScoring")
-    public BaseResponse<ScoringResultVO> initializeScoringResult(
-            @RequestParam Long questionBankId,
-            HttpServletRequest request) {
-        if (questionBankId == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long userId = userService.getLoginUser(request).getId();
-        ScoringResultVO result = questionBankService.initializeScoringResult(questionBankId, userId);
-        return ResultUtils.success(result);
-    }
-
-    /**
-     * 提交答案并评分
-     */
-    @PostMapping("/submit")
-    public BaseResponse<ScoringResultVO> submitAnswers(
-            @RequestParam Long questionBankId,
-            @RequestBody List<String> answers,
-            HttpServletRequest request) {
-        if (questionBankId == null || answers == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long userId = userService.getLoginUser(request).getId();
-        ScoringResultVO result = questionBankService.submitAnswers(questionBankId, userId, answers);
-        return ResultUtils.success(result);
     }
 
     /**

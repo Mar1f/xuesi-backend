@@ -304,7 +304,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
                     log.error("分数范围格式错误: {}", scoreRangeStr);
                     continue;
                 }
-                scoringResult.setResultScoreRange(scoreRange);
                 scoringResult.setIsDynamic(1); // 标记为AI生成
                 scoringResult.setQuestionBankId(questionBank.getId());
                 scoringResult.setUserId(questionBank.getUserId());
@@ -326,7 +325,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         ScoringResult excellent = new ScoringResult();
         excellent.setResultName("优秀");
         excellent.setResultDesc("表现优秀，继续保持！");
-        excellent.setResultScoreRange(90);
         excellent.setIsDynamic(0);
         excellent.setQuestionBankId(questionBank.getId());
         excellent.setUserId(questionBank.getUserId());
@@ -336,7 +334,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         ScoringResult good = new ScoringResult();
         good.setResultName("良好");
         good.setResultDesc("表现不错，仍有提升空间。");
-        good.setResultScoreRange(80);
         good.setIsDynamic(0);
         good.setQuestionBankId(questionBank.getId());
         good.setUserId(questionBank.getUserId());
@@ -346,7 +343,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         ScoringResult medium = new ScoringResult();
         medium.setResultName("中等");
         medium.setResultDesc("表现一般，有较大的提升空间。");
-        medium.setResultScoreRange(70);
         medium.setIsDynamic(0);
         medium.setQuestionBankId(questionBank.getId());
         medium.setUserId(questionBank.getUserId());
@@ -356,7 +352,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         ScoringResult pass = new ScoringResult();
         pass.setResultName("及格");
         pass.setResultDesc("基本掌握，需要加强练习。");
-        pass.setResultScoreRange(60);
         pass.setIsDynamic(0);
         pass.setQuestionBankId(questionBank.getId());
         pass.setUserId(questionBank.getUserId());
@@ -366,7 +361,6 @@ public class ScoringResultServiceImpl extends ServiceImpl<ScoringResultMapper, S
         ScoringResult fail = new ScoringResult();
         fail.setResultName("不及格");
         fail.setResultDesc("需要更多努力，建议重新学习。");
-        fail.setResultScoreRange(0);
         fail.setIsDynamic(0);
         fail.setQuestionBankId(questionBank.getId());
         fail.setUserId(questionBank.getUserId());

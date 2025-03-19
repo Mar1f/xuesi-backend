@@ -77,10 +77,12 @@ CREATE TABLE IF NOT EXISTS `question_bank` (
     `title`            VARCHAR(128)  NOT NULL COMMENT '题单名称',
     `description`      TEXT          NULL COMMENT '描述',
     `picture`          VARCHAR(1024) NULL COMMENT '图标',
-    `questionBankType` TINYINT       NOT NULL DEFAULT 0 COMMENT '类型: 0-得分类, 1-测评类',
+    `questionBankType` TINYINT       NOT NULL DEFAULT 0 COMMENT '类型: 0-单选, 1-填空',
     `scoringStrategy`  TINYINT       NOT NULL DEFAULT 0 COMMENT '评分策略: 0-自定义, 1-AI',
     `totalScore`       INT           NOT NULL DEFAULT 100 COMMENT '题单总分',
     `passScore`        INT           NOT NULL DEFAULT 60 COMMENT '及格分',
+    `questionCount`    INT           NOT NULL DEFAULT 0 COMMENT '题目数量',
+    `subject`         VARCHAR(64)   NULL COMMENT '学科',
     `classId` bigint NOT NULL COMMENT '所属班级ID',
     `endTime`          DATETIME      NULL COMMENT '截止时间',
     `reviewStatus`     TINYINT       NOT NULL DEFAULT 0 COMMENT '审核状态: 0-待审, 1-通过, 2-拒绝',
@@ -91,24 +93,24 @@ CREATE TABLE IF NOT EXISTS `question_bank` (
     `createTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `isDelete`         TINYINT       NOT NULL DEFAULT 0,
-    `questionCount`    INT           NOT NULL DEFAULT 0 COMMENT '题目数量',
-    `subject`         VARCHAR(64)   NULL COMMENT '学科',
     INDEX `idx_userId` (`userId`)
     ) COMMENT '题单表' COLLATE = utf8mb4_unicode_ci;
 
 -- ----------------------------
 -- 题目表
 -- ----------------------------
+USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `question` (
     `id`               BIGINT AUTO_INCREMENT COMMENT '题目ID' PRIMARY KEY,
     `questionContent`  TEXT           NOT NULL COMMENT '题干文本',
     `tags`             VARCHAR(1024)  NULL COMMENT '标签列表（json 数组）',
     `questionType`     TINYINT        NOT NULL COMMENT '题型: 0-单选, 1-多选, 2-填空',
     `options`          TEXT           NULL COMMENT '选项（JSON数组, 如["A","B"]）',
-    `answer`           VARCHAR(512)   NOT NULL COMMENT '正确答案',
+    `answer`           MEDIUMTEXT            NOT NULL COMMENT '正确答案',
     `score`            INT            NOT NULL DEFAULT 10 COMMENT '题目分值',
     `source`           TINYINT        NOT NULL DEFAULT 0 COMMENT '来源: 0-手动, 1-AI生成',
     `analysis`         TEXT           NULL COMMENT '题目解析',
+    `referenceAnswer` TEXT NULL COMMENT '参考答案（用于简答题）',
     `userId`           BIGINT         NOT NULL COMMENT '创建人ID',
     `createTime`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -117,8 +119,9 @@ CREATE TABLE IF NOT EXISTS `question` (
     ) COMMENT '题目表' COLLATE = utf8mb4_unicode_ci;
 
 -- ----------------------------
--- 题库题目表（保持不变）
+-- 题库题目表
 -- ----------------------------
+USE `xuesisi`;
 CREATE TABLE IF NOT EXISTS `question_bank_question` (
     `id`              BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
     `questionBankId`  BIGINT  NOT NULL COMMENT '题库 id',
@@ -137,10 +140,12 @@ CREATE TABLE IF NOT EXISTS `scoring_result` (
     `id`               BIGINT AUTO_INCREMENT PRIMARY KEY,
     `resultName`       VARCHAR(128) NOT NULL,
     `resultDesc`       TEXT NULL,
-    `resultScoreRange` VARCHAR(64)  NULL COMMENT '得分范围表达式（如">=80"）',
     `isDynamic`        TINYINT      DEFAULT 0 COMMENT '是否动态生成: 0-预设, 1-AI生成',
     `questionbankId`   BIGINT NOT NULL COMMENT '关联题单ID',
     `userId`           BIGINT NOT NULL COMMENT '创建人ID',
+    `score` INT NULL COMMENT '得分',
+    `duration` INT NULL COMMENT '答题用时（秒）',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '答题状态（0-未完成，1-已完成）',
     `createTime`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updateTime`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `isDelete`         TINYINT NOT NULL DEFAULT 0,
@@ -171,37 +176,32 @@ CREATE TABLE IF NOT EXISTS `user_answer` (
     ) COMMENT '用户答题记录表' COLLATE = utf8mb4_unicode_ci;
 
 -- ----------------------------
--- 用户答题详情表（新增表）
--- ----------------------------
-CREATE TABLE IF NOT EXISTS `user_answer_detail` (
-    `id`            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `userId`  BIGINT NOT NULL COMMENT '关联user_answer.id',
-    `questionId`    BIGINT NOT NULL COMMENT '题目ID',
-    `userChoice`    TEXT COMMENT '用户答案',
-     `isCorrect`     TINYINT COMMENT '是否正确: 0-否, 1-是',
-    `score`         INT COMMENT '本题得分',
-    `createTime`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_userId` (`userId`)
- )
 USE `xuesisi`;
-CREATE TABLE IF NOT EXISTS `learning_analysis` (
-     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-     `questionBankId` bigint NOT NULL COMMENT '题库ID',
-     `questionId` bigint DEFAULT NULL COMMENT '题目ID',
-     `userAnswer` text COMMENT '用户答案',
-     `score` int DEFAULT NULL COMMENT '得分',
-     `analysis` text COMMENT '分析内容',
-     `suggestion` text COMMENT '改进建议',
-      `isOverall` tinyint(1) DEFAULT '0' COMMENT '是否为总体评价',
-      `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-      `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-      `isDelete` tinyint DEFAULT '0' COMMENT '是否删除',
-      PRIMARY KEY (`id`),
-      KEY `idx_questionBankId` (`questionBankId`),
-      KEY `idx_questionId` (`questionId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学习分析表';
-
-
+CREATE TABLE `learning_analysis` (
+        `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+        `user_id` bigint NOT NULL COMMENT '学生ID',
+        `class_id` bigint NOT NULL COMMENT '班级ID',
+        `total_score` int NOT NULL COMMENT '累计总分',
+        `weak_tags` json DEFAULT NULL COMMENT '薄弱知识点ID集合（JSON数组）',
+        `knowledge_point_stats` TEXT COMMENT '知识点统计（更详细的知识点分析）',
+        `tag_stats` json DEFAULT NULL COMMENT '标签统计（如{"编程": {"correct": 5, "total": 10}}）',
+        `question_bank_id` bigint NOT NULL COMMENT '题库ID',
+        `question_id` json NOT NULL COMMENT '题目ID（JSON数组）',
+        `user_answer` json NOT NULL COMMENT '用户答案',
+        `analysis` text COMMENT '分析内容',
+        `suggestion` text COMMENT '改进建议',
+        `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+        `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+        `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
+        PRIMARY KEY (`id`),
+        KEY `idx_user_id` (`user_id`),
+        KEY `idx_class_id` (`class_id`),
+        KEY `idx_question_bank_id` (`question_bank_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学习分析统计表';
+-- 为learning_analysis表添加知识点统计字段
+ALTER TABLE learning_analysis
+    ADD COLUMN
+    ADD COLUMN
 
 -- ----------------------------
 -- 知识点表
@@ -219,32 +219,37 @@ CREATE TABLE IF NOT EXISTS `knowledge_point` (
     INDEX `idx_userId` (`userId`),
     INDEX `idx_subject` (`subject`)
     ) COMMENT '知识点表' COLLATE = utf8mb4_unicode_ci;
+-- ----------------------------
+-- 题目-知识点关系表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `question_knowledge` (
+    `id`             BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    `questionId`     BIGINT NOT NULL COMMENT '题目ID',
+    `knowledgeId`    BIGINT NOT NULL COMMENT '知识点ID',
+    `createTime`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uniq_question_knowledge` (`questionId`, `knowledgeId`),
+    INDEX `idx_knowledgeId` (`knowledgeId`)
+) COMMENT '题目-知识点关系表' COLLATE = utf8mb4_unicode_ci;
+USE `xuesisi`;
 
-CREATE TABLE `teaching_plan` (
+
+CREATE TABLE IF NOT EXISTS `teaching_plan` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `userAnswerId` bigint NOT NULL COMMENT '答题记录ID',
-    `classId` bigint DEFAULT NULL COMMENT '班级ID',
-    `knowledgeAnalysis` text COMMENT '知识点分析',
-    `teachingSuggestions` text COMMENT '教学建议',
-    `keyPoints` text COMMENT '教学重点',
-    `createTime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updateTime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `isDelete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    KEY `idx_userAnswerId` (`userAnswerId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教案表';
-use xuesisi;
--- 更新教案表结构
-ALTER TABLE `teaching_plan`
-    -- 删除旧字段
-    DROP COLUMN `teachingSuggestions`,
-    DROP COLUMN `keyPoints`,
+    `question_bank_id` bigint NOT NULL COMMENT '题库ID',
+    `user_id` bigint NOT NULL COMMENT '用户ID',
+    `user_answer_id` bigint NOT NULL COMMENT '用户答题ID',
+   `knowledge_analysis` text COMMENT '知识点分析',
+   `teaching_objectives` text COMMENT '教学目标',
+   `teaching_arrangement` json COMMENT '教学安排（JSON格式）',
+   `expected_outcomes` text COMMENT '预期学习成果',
+   `evaluation_methods` text COMMENT '评估方法',
+   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+   `is_delete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
+   PRIMARY KEY (`id`),
+   KEY `idx_user_answer_id` (`user_answer_id`),
+   KEY `idx_user_id` (`user_id`),
+   KEY `idx_question_bank_id` (`question_bank_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='教学教案表';
 
-    -- 修改知识点分析字段描述
-    MODIFY COLUMN `knowledgeAnalysis` text COMMENT '知识点分析和学生存在的问题',
 
-    -- 添加新字段
-    ADD COLUMN `teachingObjectives` text COMMENT '教学目标' AFTER `knowledgeAnalysis`,
-    ADD COLUMN `teachingArrangement` text COMMENT '教学活动安排（JSON数组，包含教学阶段、时间分配、活动安排等）' AFTER `teachingObjectives`,
-    ADD COLUMN `expectedOutcomes` text COMMENT '预期学习成果' AFTER `teachingArrangement`,
-    ADD COLUMN `evaluationMethods` text COMMENT '评估方法' AFTER `expectedOutcomes`;
