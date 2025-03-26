@@ -407,7 +407,7 @@ public class AIScoringStrategy implements ScoringStrategy {
         
         return userAnswer;
     }
-
+    
     /**
      * 保存学习分析
      */
@@ -488,7 +488,7 @@ public class AIScoringStrategy implements ScoringStrategy {
                 analysisContent.append("**详细分析**：\n").append(result.getAnalysis()).append("\n\n");
             } else {
                 boolean isCorrect = result.getScore() >= question.getScore();
-                if (isCorrect) {
+                        if (isCorrect) {
                     analysisContent.append("**详细分析**：回答正确。\n\n");
                 } else {
                     analysisContent.append("**详细分析**：回答有误。");

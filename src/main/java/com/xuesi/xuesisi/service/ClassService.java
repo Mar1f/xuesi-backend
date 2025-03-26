@@ -4,6 +4,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xuesi.xuesisi.model.entity.Class;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xuesi.xuesisi.model.vo.ClassVO;
+import com.xuesi.xuesisi.model.dto.CLass.CreateClass;
+import com.xuesi.xuesisi.model.dto.CLass.QueryClass;
+import com.xuesi.xuesisi.model.dto.CLass.QueryClassRequest;
+import com.xuesi.xuesisi.model.dto.CLass.UpdateClass;
 
 import java.util.List;
 
@@ -15,12 +19,8 @@ import java.util.List;
 public interface ClassService extends IService<Class> {
     /**
      * 创建班级
-     * @param className 班级名称
-     * @param teacherId 班主任ID
-     * @param description 班级描述
-     * @return 班级ID
      */
-    Long createClass(String className, Long teacherId, String description);
+    Long createClass(CreateClass createClass);
 
     /**
      * 添加学生到班级
@@ -62,16 +62,12 @@ public interface ClassService extends IService<Class> {
     List<Class> getAllClasses();
 
     /**
-     * 更新班级信息
-     * @param classEntity 班级信息
-     * @return 是否更新成功
+     * 更新班级
      */
-    Boolean updateClass(Class classEntity);
+    Boolean updateClass(UpdateClass updateClass);
 
     /**
      * 删除班级
-     * @param id 班级ID
-     * @return 是否删除成功
      */
     Boolean deleteClass(Long id);
 
@@ -81,7 +77,17 @@ public interface ClassService extends IService<Class> {
     Page<ClassVO> listClasses(long current, long size);
 
     /**
+     * 查询班级列表
+     */
+    List<QueryClass> queryClassList(QueryClassRequest request);
+
+    /**
      * 获取班级详情
+     */
+    QueryClass getClassDetail(Long id);
+
+    /**
+     * 根据ID获取班级信息
      */
     ClassVO getClassById(Long id);
 

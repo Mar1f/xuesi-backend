@@ -19,7 +19,7 @@
         <result property="isOverall" column="is_overall" jdbcType="BOOLEAN"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
-        <result property="isDelete" column="is_delete" jdbcType="INTEGER"/>
+        <result property="isDelete" column="isDelete" jdbcType="INTEGER"/>
     </resultMap>
 
     <sql id="Base_Column_List">
@@ -37,6 +37,6 @@
         is_overall,
         create_time,
         update_time,
-        is_delete
+        isDelete
     </sql>
 </mapper>

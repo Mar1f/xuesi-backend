@@ -43,10 +43,6 @@ public class LearningAnalysis implements Serializable {
     @TableField("total_score")
     private Integer totalScore;
 
-    /**
-     * 平均分
-     */
-    private BigDecimal avgScore;
 
     /**
      * 薄弱知识点ID集合（JSON数组）
@@ -66,11 +62,11 @@ public class LearningAnalysis implements Serializable {
     @TableField("knowledge_point_stats")
     private String knowledgePointStats;
     
-    /**
-     * 薄弱知识点ID集合（JSON数组）
-     */
-    @TableField("weak_knowledge_points")
-    private String weakKnowledgePoints;
+//    /**
+//     * 薄弱知识点ID集合（JSON数组）
+//     */
+//    @TableField("weak_knowledge_points")
+//    private String weakKnowledgePoints;
 
     /**
      * 题库ID
@@ -126,7 +122,7 @@ public class LearningAnalysis implements Serializable {
     /**
      * 是否删除
      */
-    @TableField("is_delete")
+    @TableField("isDelete")
     @TableLogic
     private Integer isDelete;
 }

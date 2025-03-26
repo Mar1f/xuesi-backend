@@ -9,6 +9,8 @@ import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.entity.Class;
 import com.xuesi.xuesisi.model.entity.User;
 import com.xuesi.xuesisi.model.vo.ClassVO;
+import com.xuesi.xuesisi.model.dto.CLass.CreateClass;
+import com.xuesi.xuesisi.model.dto.CLass.UpdateClass;
 import com.xuesi.xuesisi.service.ClassService;
 import com.xuesi.xuesisi.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -47,11 +49,13 @@ public class ClassController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "教师不存在");
         }
         
-        Long classId = classService.createClass(
-            classEntity.getClassName(),
-            classEntity.getTeacherId(),
-            classEntity.getDescription()
-        );
+        CreateClass createClass = new CreateClass();
+        createClass.setClassName(classEntity.getClassName());
+        createClass.setTeacherId(classEntity.getTeacherId().intValue());
+        createClass.setGrade(classEntity.getGrade());
+        createClass.setDescription(classEntity.getDescription());
+        
+        Long classId = classService.createClass(createClass);
         return ResultUtils.success(classId);
     }
 
@@ -63,7 +67,15 @@ public class ClassController {
         if (classEntity == null || classEntity.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        boolean result = classService.updateClass(classEntity);
+        
+        UpdateClass updateClass = new UpdateClass();
+        updateClass.setId(classEntity.getId());
+        updateClass.setClassName(classEntity.getClassName());
+        updateClass.setTeacherId(classEntity.getTeacherId());
+        updateClass.setGrade(classEntity.getGrade());
+        updateClass.setDescription(classEntity.getDescription());
+        
+        boolean result = classService.updateClass(updateClass);
         return ResultUtils.success(result);
     }
 

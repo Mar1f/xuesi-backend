@@ -38,7 +38,7 @@ public class QuestionBank implements Serializable {
     private String picture;
 
     /**
-     * 类型: 0-得分类, 1-测评类
+     * 类型: 题单类型：0-得分类, 1-多选，2-填空，3-简答
      */
     private Integer questionBankType;
 

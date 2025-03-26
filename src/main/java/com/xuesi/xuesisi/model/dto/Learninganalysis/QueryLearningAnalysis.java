@@ -16,7 +16,6 @@ public class QueryLearningAnalysis {
     private Long userId;
     private Long classId;
     private Integer totalScore;
-    private Double avgScore;
     private List<Long> weakTags;
     /**
      * 标签统计，例如 {"编程": {"correct": 5, "total": 10}}

@@ -13,8 +13,14 @@ import com.xuesi.xuesisi.model.entity.StudentClass;
 import com.xuesi.xuesisi.model.entity.TeacherClass;
 import com.xuesi.xuesisi.model.entity.User;
 import com.xuesi.xuesisi.model.vo.ClassVO;
+import com.xuesi.xuesisi.model.vo.UserVO;
+import com.xuesi.xuesisi.model.dto.CLass.CreateClass;
+import com.xuesi.xuesisi.model.dto.CLass.QueryClass;
+import com.xuesi.xuesisi.model.dto.CLass.QueryClassRequest;
+import com.xuesi.xuesisi.model.dto.CLass.UpdateClass;
 import com.xuesi.xuesisi.service.ClassService;
 import com.xuesi.xuesisi.service.UserService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,21 +49,27 @@ public class ClassServiceImpl extends ServiceImpl<ClassMapper, Class> implements
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createClass(String className, Long teacherId, String description) {
-        // 创建班级
+    public Long createClass(CreateClass createClass) {
+        if (createClass == null || createClass.getClassName() == null || createClass.getTeacherId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        
+        // 验证教师是否存在
+        User teacher = userService.getById(createClass.getTeacherId());
+        if (teacher == null || !"teacher".equals(teacher.getUserRole())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "教师不存在");
+        }
+        
         Class classEntity = new Class();
-        classEntity.setClassName(className);
-        classEntity.setTeacherId(teacherId);
-        classEntity.setDescription(description);
-        save(classEntity);
+        classEntity.setClassName(createClass.getClassName());
+        classEntity.setTeacherId(createClass.getTeacherId().longValue());
+        classEntity.setGrade(createClass.getGrade());
+        classEntity.setDescription(createClass.getDescription());
         
-        // 添加班主任到教师-班级关联表
-        TeacherClass teacherClass = new TeacherClass();
-        teacherClass.setClassId(classEntity.getId());
-        teacherClass.setTeacherId(teacherId);
-        teacherClass.setSubject("班主任");
-        teacherClassMapper.insert(teacherClass);
-        
+        boolean success = this.save(classEntity);
+        if (!success) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+        }
         return classEntity.getId();
     }
 
@@ -124,11 +136,19 @@ public class ClassServiceImpl extends ServiceImpl<ClassMapper, Class> implements
     }
 
     @Override
-    public Boolean updateClass(Class classEntity) {
-        if (classEntity == null || classEntity.getId() == null) {
+    public Boolean updateClass(UpdateClass updateClass) {
+        if (updateClass == null || updateClass.getTeacherId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        return updateById(classEntity);
+        
+        Class classEntity = new Class();
+        classEntity.setId(updateClass.getId());
+        classEntity.setClassName(updateClass.getClassName());
+        classEntity.setTeacherId(updateClass.getTeacherId());
+        classEntity.setGrade(updateClass.getGrade());
+        classEntity.setDescription(updateClass.getDescription());
+        
+        return this.updateById(classEntity);
     }
 
     @Override
@@ -155,10 +175,12 @@ public class ClassServiceImpl extends ServiceImpl<ClassMapper, Class> implements
         if (id == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        
         Class classEntity = this.getById(id);
         if (classEntity == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
+        
         return convertToVO(classEntity);
     }
 
@@ -215,8 +237,130 @@ public class ClassServiceImpl extends ServiceImpl<ClassMapper, Class> implements
             return null;
         }
         ClassVO classVO = new ClassVO();
-        BeanUtils.copyProperties(classEntity, classVO);
-        // TODO: 设置学生和教师信息
+        classVO.setId(classEntity.getId());
+        classVO.setName(classEntity.getClassName());
+        classVO.setDescription(classEntity.getDescription());
+        classVO.setGrade(classEntity.getGrade());
+        classVO.setHeadTeacherId(classEntity.getTeacherId());
+        classVO.setCreateTime(java.util.Date.from(classEntity.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        classVO.setUpdateTime(java.util.Date.from(classEntity.getUpdateTime().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        classVO.setIsDelete(classEntity.getIsDelete());
+        
+        // 获取班主任信息
+        User headTeacher = userService.getById(classEntity.getTeacherId());
+        if (headTeacher != null) {
+            classVO.setHeadTeacherName(headTeacher.getUserName());
+        }
+        
+        // 获取学生列表
+        LambdaQueryWrapper<StudentClass> studentQueryWrapper = new LambdaQueryWrapper<>();
+        studentQueryWrapper.eq(StudentClass::getClassId, classEntity.getId());
+        List<StudentClass> studentClasses = studentClassMapper.selectList(studentQueryWrapper);
+        List<Long> studentIds = studentClasses.stream()
+                .map(StudentClass::getStudentId)
+                .collect(Collectors.toList());
+        classVO.setStudentIds(studentIds);
+        
+        // 如果有学生ID，获取学生详细信息
+        if (!studentIds.isEmpty()) {
+            List<User> students = userService.listByIds(studentIds);
+            List<UserVO> studentVOs = students.stream()
+                    .filter(student -> student.getIsDelete() == null || student.getIsDelete() == 0)
+                    .map(student -> {
+                        UserVO userVO = new UserVO();
+                        BeanUtils.copyProperties(student, userVO);
+                        return userVO;
+                    })
+                    .collect(Collectors.toList());
+            classVO.setStudents(studentVOs);
+            classVO.setStudentIds(studentVOs.stream()
+                    .map(UserVO::getId)
+                    .collect(Collectors.toList()));
+        }
+        
+        // 获取教师列表
+        LambdaQueryWrapper<TeacherClass> teacherQueryWrapper = new LambdaQueryWrapper<>();
+        teacherQueryWrapper.eq(TeacherClass::getClassId, classEntity.getId());
+        List<TeacherClass> teacherClasses = teacherClassMapper.selectList(teacherQueryWrapper);
+        List<Long> teacherIds = teacherClasses.stream()
+                .map(TeacherClass::getTeacherId)
+                .collect(Collectors.toList());
+        classVO.setTeacherIds(teacherIds);
+        
+        // 如果有教师ID，获取教师详细信息
+        if (!teacherIds.isEmpty()) {
+            List<User> teachers = userService.listByIds(teacherIds);
+            List<UserVO> teacherVOs = teachers.stream()
+                    .filter(teacher -> teacher.getIsDelete() == null || teacher.getIsDelete() == 0)
+                    .map(teacher -> {
+                        UserVO userVO = new UserVO();
+                        BeanUtils.copyProperties(teacher, userVO);
+                        return userVO;
+                    })
+                    .collect(Collectors.toList());
+            classVO.setTeachers(teacherVOs);
+            classVO.setTeacherIds(teacherVOs.stream()
+                    .map(UserVO::getId)
+                    .collect(Collectors.toList()));
+        }
+        
         return classVO;
+    }
+
+    @Override
+    public List<QueryClass> queryClassList(QueryClassRequest request) {
+        LambdaQueryWrapper<Class> queryWrapper = new LambdaQueryWrapper<>();
+        
+        if (request.getClassName() != null) {
+            queryWrapper.like(Class::getClassName, request.getClassName());
+        }
+        if (request.getGrade() != null) {
+            queryWrapper.eq(Class::getGrade, request.getGrade());
+        }
+        if (request.getTeacherId() != null) {
+            queryWrapper.eq(Class::getTeacherId, request.getTeacherId());
+        }
+        
+        List<Class> classList = this.list(queryWrapper);
+        return classList.stream().map(classEntity -> {
+            QueryClass queryClass = new QueryClass();
+            queryClass.setId(classEntity.getId());
+            queryClass.setClassName(classEntity.getClassName());
+            queryClass.setTeacherId(classEntity.getTeacherId());
+            queryClass.setIsDelete(classEntity.getIsDelete() ? 1 : 0);
+            return queryClass;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public QueryClass getClassDetail(Long id) {
+        if (id == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        
+        Class classEntity = this.getById(id);
+        if (classEntity == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        
+        QueryClass queryClass = new QueryClass();
+        queryClass.setId(classEntity.getId());
+        queryClass.setClassName(classEntity.getClassName());
+        queryClass.setTeacherId(classEntity.getTeacherId());
+        queryClass.setIsDelete(classEntity.getIsDelete() ? 1 : 0);
+        
+        return queryClass;
+    }
+
+    /**
+     * 将Class实体转换为QueryClass对象
+     */
+    private QueryClass convertToQueryClass(Class classEntity) {
+        QueryClass queryClass = new QueryClass();
+        queryClass.setId(classEntity.getId());
+        queryClass.setClassName(classEntity.getClassName());
+        queryClass.setTeacherId(classEntity.getTeacherId());
+        queryClass.setIsDelete(classEntity.getIsDelete() ? 1 : 0);
+        return queryClass;
     }
 }

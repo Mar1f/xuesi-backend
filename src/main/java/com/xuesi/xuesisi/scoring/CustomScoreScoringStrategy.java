@@ -81,12 +81,12 @@ public class CustomScoreScoringStrategy implements ScoringStrategy {
             List<String> correctAnswers = question.getAnswer();
             
             // 根据题目类型进行不同的答案比较
-            if (question.getQuestionType() == 0) { // 单选题
+            if (question.getQuestionType() == 1) { // 单选题
                 if (correctAnswers != null && !correctAnswers.isEmpty() && 
                     userAnswer != null && correctAnswers.get(0).equals(userAnswer)) {
                     totalScore += question.getScore() != null ? question.getScore() : 10;
                 }
-            } else if (question.getQuestionType() == 1) { // 多选题
+            } else if (question.getQuestionType() == 2) { // 多选题
                 // 将用户答案拆分为列表（例如："ABC" -> ["A", "B", "C"]）
                 List<String> userAnswers = userAnswer != null ? 
                     userAnswer.chars()

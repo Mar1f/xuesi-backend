@@ -56,7 +56,7 @@ public class StudentClass implements Serializable {
      * 是否删除
      */
     @TableLogic
-    @TableField("is_delete")
+    @TableField("isDelete")
     private Boolean isDelete;
 
     @TableField(exist = false)

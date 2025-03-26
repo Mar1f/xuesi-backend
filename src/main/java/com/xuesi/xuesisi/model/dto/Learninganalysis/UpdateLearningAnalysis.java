@@ -12,7 +12,6 @@ import java.util.List;
 @Data
 public class UpdateLearningAnalysis {
     private Integer totalScore;
-    private Double avgScore;
     private List<Long> weakTags;
     private String tagStats;
 }

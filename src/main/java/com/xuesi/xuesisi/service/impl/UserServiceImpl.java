@@ -323,6 +323,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 queryWrapper.like("user_profile", safeUserProfile);
             }
 
+            // 过滤掉已删除的用户
+            queryWrapper.eq("isDelete", 0);
+
             // 排序处理
             if (StringUtils.isNotBlank(sortField)) {
                 if (sortField.matches("^[a-zA-Z0-9_]{1,20}$")) {

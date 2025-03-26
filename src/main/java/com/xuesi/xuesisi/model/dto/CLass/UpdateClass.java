@@ -9,6 +9,28 @@ import lombok.Data;
  **/
 @Data
 public class UpdateClass {
+    /**
+     * 班级ID
+     */
+    private Long id;
+
+    /**
+     * 班级名称
+     */
     private String className;
+
+    /**
+     * 班主任ID
+     */
     private Long teacherId;
+
+    /**
+     * 年级
+     */
+    private String grade;
+
+    /**
+     * 班级描述
+     */
+    private String description;
 }

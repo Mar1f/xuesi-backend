@@ -7,13 +7,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * App 应用类型枚举
- *
+ * 题库类型枚举
  */
 public enum QuestionBankTypeEnum {
 
-    SCORE("得分类", 0),
-    TEST("测评类", 1);
+    SINGLE_CHOICE("单选题", 0),
+    MULTIPLE_CHOICE("多选题", 1),
+    FILL_BLANK("填空题", 2),
+    SHORT_ANSWER("简答题", 3);
 
     private final String text;
 

@@ -90,7 +90,7 @@ public class TeachingPlan implements Serializable {
     /**
      * 是否删除
      */
-    @TableField("is_delete")
+    @TableField("isDelete")
     @TableLogic
     private Integer isDelete;
 }

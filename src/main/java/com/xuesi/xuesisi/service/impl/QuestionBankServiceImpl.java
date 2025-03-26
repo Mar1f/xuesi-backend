@@ -155,7 +155,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         
         try {
             log.info("开始调用AI服务生成题目");
-            
+                
             // 调用AI服务生成题目
             String aiResponse = deepseekService.chat(prompt);
             log.info("AI响应: {}", aiResponse);
@@ -168,7 +168,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
             
             // 提取JSON内容
             String jsonContent = extractJsonFromResponse(aiResponse);
-            
+                
             // 如果JSON内容为空，报错
             if (StringUtils.isBlank(jsonContent)) {
                 log.error("AI生成题目失败：无法提取有效JSON内容");
@@ -186,7 +186,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                     log.error("AI生成题目失败：题目列表为空");
                     throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI生成题目失败：题目列表为空");
                 }
-            } catch (Exception e) {
+        } catch (Exception e) {
                 log.error("AI生成题目失败：JSON解析错误", e);
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI生成题目失败：" + e.getMessage());
             }
@@ -1057,7 +1057,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                         .replaceAll("(?m)\"\\s*]\\s*", "\"]") // 统一右中括号前格式
                         .replaceAll("(?m),\\s*}", "}") // 移除对象末尾多余的逗号
                         .replaceAll("(?m),\\s*]", "]"); // 移除数组末尾多余的逗号
-
+        
         return jsonStr;
     }
 
@@ -1410,7 +1410,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, 
                     String.format("第%d题是多选题，答案必须包含2-4个选项", index));
             }
-            
+        
             // 将答案字符串（如"ABC"）转换为字符数组，以便验证每个字符
             char[] answerChars = answer.toCharArray();
             Set<Character> answerSet = new HashSet<>();
@@ -1420,11 +1420,11 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
             
             // 验证多选题至少选择2个选项，最多选择4个选项
             if (answerSet.size() < 2 || answerSet.size() > 4) {
-                throw new BusinessException(ErrorCode.PARAMS_ERROR, 
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, 
                     String.format("第%d题是多选题，答案必须包含2-4个不同选项", index));
-            }
-            
-            // 验证每个选项是否有效
+        }
+        
+        // 验证每个选项是否有效
             for (char c : answerChars) {
                 if (c < 'A' || c > 'D') {
                     throw new BusinessException(ErrorCode.PARAMS_ERROR, 
@@ -1719,7 +1719,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         String answer = questionObj.getStr("answer");
         if (answer != null) {
             // 选择题的答案需要设置为列表
-            if (isMultiple) {
+        if (isMultiple) {
                 // 多选题答案处理 - 将格式如"ABC"转换为["A","B","C"]
                 List<String> answers = new ArrayList<>();
                 
@@ -1749,11 +1749,11 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                     }
                 }
                 
-                question.setAnswer(answers);
+            question.setAnswer(answers);
                 log.debug("处理多选题答案: {} -> {}", answer, answers);
-            } else {
-                // 单选题答案处理
-                question.setAnswer(Collections.singletonList(answer));
+        } else {
+            // 单选题答案处理
+            question.setAnswer(Collections.singletonList(answer));
             }
         } else {
             // 单选题答案处理
@@ -1936,8 +1936,45 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         if (id == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        // 删除题库
-        return removeById(id);
+        
+        // 检查题库是否存在
+        QuestionBank questionBank = getById(id);
+        if (questionBank == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题库不存在");
+        }
+        
+        // 1. 获取题库关联的所有题目ID
+        List<QuestionBankQuestion> questionBankQuestions = questionBankQuestionService.list(
+            new LambdaQueryWrapper<QuestionBankQuestion>()
+                .eq(QuestionBankQuestion::getQuestionBankId, id)
+        );
+        
+        List<Long> questionIds = questionBankQuestions.stream()
+            .map(QuestionBankQuestion::getQuestionId)
+            .collect(Collectors.toList());
+        
+        log.info("删除题库 ID: {}, 关联题目数量: {}", id, questionIds.size());
+        
+        // 2. 删除题库与题目的关联关系
+        boolean relationRemoved = questionBankQuestionService.remove(
+            new LambdaQueryWrapper<QuestionBankQuestion>()
+                .eq(QuestionBankQuestion::getQuestionBankId, id)
+        );
+        
+        log.info("删除题库 ID: {}, 已删除题库与题目的关联关系: {}", id, relationRemoved);
+        
+        // 3. 删除题目
+        if (!questionIds.isEmpty()) {
+            boolean questionsRemoved = questionService.removeByIds(questionIds);
+            log.info("删除题库 ID: {}, 已删除关联题目: {}", id, questionsRemoved);
+        }
+        
+        // 4. 删除题库
+        boolean result = removeById(id);
+        
+        log.info("删除题库 ID: {}, 删除结果: {}", id, result);
+        
+        return result;
     }
 
     @Override
@@ -2192,16 +2229,16 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         
         // 根据题型添加特定指南
         switch (questionBank.getQuestionBankType()) {
-            case 0:
+            case 0: 
                 promptBuilder.append("\n\n").append(buildSingleChoicePrompt());
                 break;
-            case 1:
+            case 1: 
                 promptBuilder.append("\n\n").append(buildMultipleChoicePrompt());
                 break;
-            case 2:
+            case 2: 
                 promptBuilder.append("\n\n").append(buildFillinTheBlankPrompt());
                 break;
-            case 3:
+            case 3: 
                 promptBuilder.append("\n\n").append(buildShortAnswerPrompt());
                 break;
             default:
@@ -2233,20 +2270,21 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                     .append("   - 错误格式：\"content\": \"函数 \\\\( f(x) = x^2 \\\\) 的导数\"\n")
                     .append("   - 错误格式：\"options\": [\"\\\\sin(x)\", \"\\\\cos(x)\"]\n\n");
         
-        // 添加输出格式要求
+        // 添加通用的输出格式要求
         promptBuilder.append("输出格式：\n")
                     .append("1. 直接返回有效的JSON，不要包含markdown代码块标记\n")
                     .append("2. 不要在JSON前后添加任何说明文字\n")
                     .append("3. 返回前务必检查JSON格式的有效性\n")
-                    .append("4. 确保所有数学公式都使用纯文本表示，无特殊符号\n")
+                    .append("4. 确保所有数学公式都使用标准数学表示法（如x^2, sin(x), log(x)等），无需翻译成中文\n")
                     .append("5. 避免使用任何可能导致JSON解析错误的特殊字符\n\n");
         
         // 最终检查清单
         promptBuilder.append("最终检查清单（返回前请一一确认）：\n")
                     .append("1. JSON格式是否有效且完整\n")
-                    .append("2. 所有数学公式是否使用了纯文本格式\n")
+                    .append("2. 所有数学公式是否使用了标准数学表示法\n")
                     .append("3. 是否没有使用任何LaTeX命令\n")
-                    .append("4. 是否直接返回JSON而不附加其他内容");
+                    .append("4. 题目、选项、解析是否都使用了中文\n")
+                    .append("5. 是否直接返回JSON而不附加其他内容");
         
         String prompt = promptBuilder.toString();
         log.info("生成的AI提示词: {}", prompt);
@@ -2266,17 +2304,19 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         prompt.append("5. 在表示导数时，请使用df/dx表示法而不是f'(x)表示法，避免使用单引号，以确保生成的JSON格式正确。\n");
         prompt.append("6. 确保所有数学公式和符号格式正确，特别是在处理特殊符号时。\n");
         prompt.append("7. 请确保四个选项都不相同，避免生成相同的选项造成混淆。\n");
-        prompt.append("8. 你的回答必须是一个格式正确的JSON字符串，包含一个questions数组，每个问题对象具有以下结构：\n");
+        prompt.append("8. 所有题目、选项、答案分析必须使用中文，不允许出现英文题目或内容。数学公式可以使用标准数学表示法，如x^2, sin(x), log(x)等，无需翻译成中文。\n");
+        prompt.append("9. 如果题目涉及到专业术语，必须使用中文表达，不要使用英文术语。\n");
+        prompt.append("10. 你的回答必须是一个格式正确的JSON字符串，包含一个questions数组，每个问题对象具有以下结构：\n");
         prompt.append("```json\n");
         prompt.append("{\n");
         prompt.append("  \"questions\": [\n");
         prompt.append("    {\n");
-        prompt.append("      \"content\": \"题目内容\",\n");
-        prompt.append("      \"options\": [\"选项A\", \"选项B\", \"选项C\", \"选项D\"],\n");
+        prompt.append("      \"content\": \"题目内容（必须是中文）\",\n");
+        prompt.append("      \"options\": [\"选项A（中文）\", \"选项B（中文）\", \"选项C（中文）\", \"选项D（中文）\"],\n");
         prompt.append("      \"answer\": \"正确选项，如A、B等\",\n");
         prompt.append("      \"score\": 10,\n");
-        prompt.append("      \"analysis\": \"详细解析\",\n");
-        prompt.append("      \"knowledgeTags\": [\"知识点1\", \"知识点2\"]\n");
+        prompt.append("      \"analysis\": \"详细解析（必须是中文）\",\n");
+        prompt.append("      \"knowledgeTags\": [\"知识点1（中文）\", \"知识点2（中文）\"]\n");
         prompt.append("    },\n");
         prompt.append("    // ... 其他问题\n");
         prompt.append("  ]\n");
@@ -2300,17 +2340,19 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         prompt.append("5. 在表示导数时，请使用df/dx表示法而不是f'(x)表示法，避免使用单引号，以确保生成的JSON格式正确。\n");
         prompt.append("6. 确保所有数学公式和符号格式正确，特别是在处理特殊符号时。\n");
         prompt.append("7. 请确保四个选项都不相同，避免生成相同的选项造成混淆。\n");
-        prompt.append("8. 你的回答必须是一个格式正确的JSON字符串，包含一个questions数组，每个问题对象具有以下结构：\n");
+        prompt.append("8. 所有题目、选项、答案分析必须使用中文，不允许出现英文题目或内容。数学公式可以使用标准数学表示法，如x^2, sin(x), log(x)等，无需翻译成中文。\n");
+        prompt.append("9. 如果题目涉及到专业术语，必须使用中文表达，不要使用英文术语。\n");
+        prompt.append("10. 你的回答必须是一个格式正确的JSON字符串，包含一个questions数组，每个问题对象具有以下结构：\n");
         prompt.append("```json\n");
         prompt.append("{\n");
         prompt.append("  \"questions\": [\n");
         prompt.append("    {\n");
-        prompt.append("      \"content\": \"题目内容\",\n");
-        prompt.append("      \"options\": [\"选项A\", \"选项B\", \"选项C\", \"选项D\"],\n");
+        prompt.append("      \"content\": \"题目内容（必须是中文）\",\n");
+        prompt.append("      \"options\": [\"选项A（中文）\", \"选项B（中文）\", \"选项C（中文）\", \"选项D（中文）\"],\n");
         prompt.append("      \"answer\": \"正确选项组合，如AB、BCD等\",\n");
         prompt.append("      \"score\": 10,\n");
-        prompt.append("      \"analysis\": \"详细解析\",\n");
-        prompt.append("      \"knowledgeTags\": [\"知识点1\", \"知识点2\"]\n");
+        prompt.append("      \"analysis\": \"详细解析（必须是中文）\",\n");
+        prompt.append("      \"knowledgeTags\": [\"知识点1（中文）\", \"知识点2（中文）\"]\n");
         prompt.append("    },\n");
         prompt.append("    // ... 其他问题\n");
         prompt.append("  ]\n");
@@ -2333,8 +2375,10 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         prompt.append("3. 题干必须明确指出需要填写的内容\n");
         prompt.append("4. 题干中用\"____\"表示填空部分\n");
         prompt.append("5. analysis字段需解释为什么答案是正确的\n");
-        prompt.append("6. score字段必须设置为10分\n\n");
-        
+        prompt.append("6. score字段必须设置为10分\n");
+        prompt.append("7. 所有题目、答案和解析必须使用中文，不允许出现英文题目或内容。数学公式可以使用标准数学表示法，如x^2, sin(x), log(x)等，无需翻译成中文\n");
+        prompt.append("8. 如果涉及到专业术语，必须使用中文表达，不要使用英文术语\n\n");
+
         prompt.append("填空题示例（格式要严格按照此示例）：\n");
         prompt.append("{\n");
         prompt.append("  \"questions\": [\n");
@@ -2362,7 +2406,9 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         prompt.append("2. 答案应简明扼要，包含必要的步骤和关键结论\n");
         prompt.append("3. 题目内容应清晰表达所求内容\n");
         prompt.append("4. analysis字段需提供详细的解答思路\n");
-        prompt.append("5. score字段必须设置为10分\n\n");
+        prompt.append("5. score字段必须设置为10分\n");
+        prompt.append("6. 所有题目、答案和解析必须使用中文，不允许出现英文题目或内容。数学公式可以使用标准数学表示法，如x^2, sin(x), log(x)等，无需翻译成中文\n");
+        prompt.append("7. 如果涉及到专业术语，必须使用中文表达，不要使用英文术语\n\n");
         
         prompt.append("简答题示例（格式要严格按照此示例）：\n");
         prompt.append("{\n");
@@ -2371,8 +2417,8 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         prompt.append("      \"content\": \"简要证明：两个连续函数的和是连续函数。\",\n");
         prompt.append("      \"answer\": \"设f(x)和g(x)是定义在区间I上的连续函数，那么对于任意x0∈I，有lim(x→x0)f(x)=f(x0)且lim(x→x0)g(x)=g(x0)。根据极限的四则运算法则，lim(x→x0)[f(x)+g(x)]=lim(x→x0)f(x)+lim(x→x0)g(x)=f(x0)+g(x0)=(f+g)(x0)。这表明函数f+g在x0处连续。由于x0是区间I上的任意点，所以f+g在区间I上处处连续，即两个连续函数的和是连续函数。\",\n");
         prompt.append("      \"score\": 10,\n");
-        prompt.append("      \"analysis\": \"证明两个连续函数的和是连续函数需要用到连续函数的定义和极限的四则运算性质。根据连续函数的定义，f(x)在点x0连续，当且仅当lim(x→x0)f(x)=f(x0)。对于函数和h(x)=f(x)+g(x)，我们需要证明lim(x→x0)h(x)=h(x0)。利用极限的加法法则，lim(x→x0)[f(x)+g(x)]=lim(x→x0)f(x)+lim(x→x0)g(x)。由于f和g都是连续函数，所以lim(x→x0)f(x)=f(x0)且lim(x→x0)g(x)=g(x0)，代入得lim(x→x0)[f(x)+g(x)]=f(x0)+g(x0)=(f+g)(x0)=h(x0)。这说明h(x)在x0处连续。因为x0是任意点，所以h(x)在其定义域上处处连续。\",\n");
-        prompt.append("      \"knowledgeTags\": [\"函数连续性\", \"极限\", \"极限运算法则\", \"数学证明\"]\n");
+        prompt.append("      \"analysis\": \"这道题目要求证明两个连续函数的和是连续函数。证明的关键是利用连续函数的定义和极限的四则运算法则。首先，对于连续函数f(x)和g(x)，在任意点x0处都有lim(x→x0)f(x)=f(x0)和lim(x→x0)g(x)=g(x0)。根据极限的加法法则，lim(x→x0)[f(x)+g(x)]=lim(x→x0)f(x)+lim(x→x0)g(x)=f(x0)+g(x0)=(f+g)(x0)，这正好符合函数在点x0处连续的定义。由于x0是任意点，因此f+g在整个区间上都是连续的。\",\n");
+        prompt.append("      \"knowledgeTags\": [\"函数连续性\", \"极限\", \"函数性质\"]\n");
         prompt.append("    }\n");
         prompt.append("  ]\n");
         prompt.append("}\n");
@@ -2494,7 +2540,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
                 jsonStr = emergencyFixJson(jsonStr);
                 
                 try {
-                    // 再次尝试解析
+                // 再次尝试解析
                     ObjectMapper mapper = new ObjectMapper();
                     mapper.readTree(jsonStr);
                     return jsonStr;

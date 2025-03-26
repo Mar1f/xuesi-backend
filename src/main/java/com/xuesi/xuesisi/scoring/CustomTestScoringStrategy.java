@@ -98,7 +98,7 @@ public class CustomTestScoringStrategy implements ScoringStrategy {
             
             // 根据题目类型进行不同的评分处理
             switch (questionVO.getQuestionType()) {
-                case 0: // 选择题
+                case 1: // 选择题
                     // 如果答案完全匹配
                     if (questionVO.getAnswer().contains(userAnswer)) {
                         questionScore = question.getScore();
@@ -108,7 +108,17 @@ public class CustomTestScoringStrategy implements ScoringStrategy {
                     }
                     break;
                     
-                case 1: // 填空题
+                case 2: // 多选题
+                    // 处理多选题，用逗号分隔的答案
+                    if (questionVO.getAnswer().contains(userAnswer)) {
+                        questionScore = question.getScore();
+                        scoreDetail = String.format("多选题 #%d: 答案正确，得分 %d", i + 1, questionScore);
+                    } else {
+                        scoreDetail = String.format("多选题 #%d: 答案错误，得分 0", i + 1);
+                    }
+                    break;
+                    
+                case 3: // 填空题
                     // 获取正确答案
                     List<String> correctAnswers = questionVO.getAnswer();
                     if (correctAnswers != null && !correctAnswers.isEmpty()) {
@@ -122,7 +132,7 @@ public class CustomTestScoringStrategy implements ScoringStrategy {
                     }
                     break;
                     
-                case 2: // 简答题
+                case 4: // 简答题
                     // 提取参考答案中的关键词
                     List<String> keywords = AnswerMatchUtils.extractKeywords(questionVO.getReferenceAnswer());
                     // 计算答案匹配度

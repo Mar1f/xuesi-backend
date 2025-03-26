@@ -16,7 +16,7 @@ public class CreateQuestionBank {
         private String description;
         private String picture;
         /**
-         * 题单类型：0-得分类, 1-测评类
+         * 题单类型：0-得分类, 1-多选，2-填空，3-简答
          */
         private Integer questionBankType;
         /**
