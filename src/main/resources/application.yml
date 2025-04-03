@@ -99,7 +99,13 @@ knife4j:
 # DeepSeek 配置
 deepseek:
   api-key: sk-mhvldecltnlzzjiamchmcvnducfkangmlmkpkjsxwoefdsmm # 从环境变量中获取
-  model: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B  # 模型 :deepseek-ai/DeepSeek-V3
+#  sk-zzldlkgmdssgkxjcxwirkeubjwdqcrkkkinotftecnzdzwlf
+  model: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+  # 模型 :deepseek-ai/DeepSeek-V3
+#  deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+  # Qwen/Qwen2.5-72B-Instruct-128K
+  # deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+  # deepseek-ai/DeepSeek-R1
   max-tokens: 4000 # 增加 token 限制以获取更详细的分析
   temperature: 0.7 # 更新为官方推荐的温度值
   api-url: https://api.siliconflow.cn/v1/chat/completions # 更新为正确的 API 端点

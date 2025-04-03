@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xuesi.xuesisi.mapper.TeachingPlanMapper">
+
+    <resultMap id="BaseResultMap" type="com.xuesi.xuesisi.model.entity.TeachingPlan">
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="questionBankId" column="question_bank_id" jdbcType="BIGINT"/>
+        <result property="userId" column="user_id" jdbcType="BIGINT"/>
+        <result property="userAnswerId" column="user_answer_id" jdbcType="BIGINT"/>
+        <result property="subject" column="subject" jdbcType="VARCHAR"/>
+        <result property="knowledgePoints" column="knowledge_points" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="knowledgeAnalysis" column="knowledge_analysis" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="teachingObjectives" column="teaching_objectives" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="teachingArrangement" column="teaching_arrangement" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="expectedOutcomes" column="expected_outcomes" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="evaluationMethods" column="evaluation_methods" 
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+        <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, question_bank_id, user_id, user_answer_id, subject, knowledge_points, knowledge_analysis, 
+        teaching_objectives, teaching_arrangement, expected_outcomes, evaluation_methods, 
+        create_time, update_time, isDelete
+    </sql>
+</mapper> 

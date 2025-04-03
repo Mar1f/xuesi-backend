@@ -7,6 +7,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.common.BaseResponse;
+import com.xuesi.xuesisi.event.TeachingPlanGenerationEvent;
 import com.xuesi.xuesisi.exception.BusinessException;
 import com.xuesi.xuesisi.model.dto.userAnswer.UserAnswerAddRequest;
 import com.xuesi.xuesisi.model.entity.*;
@@ -26,6 +27,7 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import cn.hutool.json.JSONConfig;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * AI 评分策略
@@ -51,12 +53,13 @@ public class AIScoringStrategy implements ScoringStrategy {
     private LearningAnalysisService learningAnalysisService;
 
     @Resource
-    private TeachingPlanGenerationService teachingPlanGenerationService;
-
-    @Resource
     private QuestionKnowledgeService questionKnowledgeService;
     @Resource
     private UserAnswerService userAnswerService;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
     public UserAnswer doScore(List<String> choices, QuestionBank questionBank) throws Exception {
         validateInput(questionBank, choices);
@@ -85,7 +88,12 @@ public class AIScoringStrategy implements ScoringStrategy {
         }
         
         // 3. 保存结果（使用独立的事务）
-        return saveResultsWithRetry(questionBank, choices, totalScore, scoringResults, questions);
+        UserAnswer userAnswer = saveResultsWithRetry(questionBank, choices, totalScore, scoringResults, questions);
+
+        // 在保存结果后，发布事件通知教学计划生成
+        eventPublisher.publishEvent(new TeachingPlanGenerationEvent(questionBank, scoringResults));
+
+        return userAnswer;
     }
     
     /**
@@ -401,9 +409,6 @@ public class AIScoringStrategy implements ScoringStrategy {
         userAnswer.setResultName(scoringResult.getResultName());
         userAnswer.setResultDesc(scoringResult.getResultDesc());
         userAnswer.setResultScore(totalScore);
-        
-        userAnswerService.save(userAnswer);
-        log.info("用户答案已保存，ID: {}, 总分: {}", userAnswer.getId(), totalScore);
         
         return userAnswer;
     }

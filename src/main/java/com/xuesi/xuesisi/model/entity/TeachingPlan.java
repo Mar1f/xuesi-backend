@@ -5,18 +5,19 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
 import java.io.Serializable;
 import java.util.Date;
 
 /**
- * @description；
+ * @description；教学计划实体类
  * @author:mar1
  * @data:2025/03/15
  **/
 @Data
-@TableName("teaching_plan")
+@TableName(value = "teaching_plan", autoResultMap = true)
 public class TeachingPlan implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -46,34 +47,46 @@ public class TeachingPlan implements Serializable {
     private Long userAnswerId;
 
     /**
+     * 学科
+     */
+    @TableField("subject")
+    private String subject;
+
+    /**
+     * 知识点列表（JSON数组）
+     */
+    @TableField(value = "knowledge_points", typeHandler = JacksonTypeHandler.class)
+    private Object knowledgePoints;
+
+    /**
      * 知识点分析
      */
-    @TableField("knowledge_analysis")
-    private String knowledgeAnalysis;
+    @TableField(value = "knowledge_analysis", typeHandler = JacksonTypeHandler.class)
+    private Object knowledgeAnalysis;
 
     /**
      * 教学目标
      */
-    @TableField("teaching_objectives")
-    private String teachingObjectives;
+    @TableField(value = "teaching_objectives", typeHandler = JacksonTypeHandler.class)
+    private Object teachingObjectives;
 
     /**
      * 教学安排（JSON格式）
      */
-    @TableField("teaching_arrangement")
-    private String teachingArrangement;
+    @TableField(value = "teaching_arrangement", typeHandler = JacksonTypeHandler.class)
+    private Object teachingArrangement;
 
     /**
      * 预期成果
      */
-    @TableField("expected_outcomes")
-    private String expectedOutcomes;
+    @TableField(value = "expected_outcomes", typeHandler = JacksonTypeHandler.class)
+    private Object expectedOutcomes;
 
     /**
      * 评估方法
      */
-    @TableField("evaluation_methods")
-    private String evaluationMethods;
+    @TableField(value = "evaluation_methods", typeHandler = JacksonTypeHandler.class)
+    private Object evaluationMethods;
 
     /**
      * 创建时间
@@ -90,7 +103,7 @@ public class TeachingPlan implements Serializable {
     /**
      * 是否删除
      */
-    @TableField("isDelete")
     @TableLogic
+    @TableField("isDelete")
     private Integer isDelete;
 }

@@ -1,17 +1,28 @@
 package com.xuesi.xuesisi.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xuesi.xuesisi.common.ErrorCode;
 import com.xuesi.xuesisi.exception.BusinessException;
+import com.xuesi.xuesisi.mapper.TeachingPlanMapper;
 import com.xuesi.xuesisi.model.entity.Question;
 import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.QuestionBankQuestion;
+import com.xuesi.xuesisi.model.entity.QuestionScoringResult;
 import com.xuesi.xuesisi.model.entity.TeachingPlan;
+import com.xuesi.xuesisi.model.entity.UserAnswer;
+import com.xuesi.xuesisi.model.vo.QuestionVO;
 import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 import com.xuesi.xuesisi.service.DeepSeekService;
 import com.xuesi.xuesisi.service.QuestionService;
+import com.xuesi.xuesisi.service.QuestionBankService;
+import com.xuesi.xuesisi.service.QuestionBankQuestionService;
 import com.xuesi.xuesisi.service.TeachingPlanGenerationService;
+import com.xuesi.xuesisi.service.UserAnswerService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -22,36 +33,265 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class TeachingPlanGenerationServiceImpl implements TeachingPlanGenerationService {
+public class TeachingPlanGenerationServiceImpl extends ServiceImpl<TeachingPlanMapper, TeachingPlan> implements TeachingPlanGenerationService {
+
+    @Resource
+    private QuestionService questionService;
+
+    @Resource
+    private QuestionBankService questionBankService;
 
     @Resource
     private DeepSeekService deepSeekService;
 
     @Resource
-    private QuestionService questionService;
+    private UserAnswerService userAnswerService;
+
+    @Resource
+    private QuestionBankQuestionService questionBankQuestionService;
 
     @Override
-    public TeachingPlan generateTeachingPlan(QuestionBank questionBank, UserAnswerVO userAnswerVO, String aiResponse) {
+    public TeachingPlan generateTeachingPlan(QuestionBank questionBank, List<QuestionScoringResult> scoringResults, Long userAnswerId) {
+        if (questionBank == null || scoringResults == null || scoringResults.isEmpty() || userAnswerId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        // 构建提示词
+        String prompt = buildTeachingPlanPrompt(questionBank, scoringResults);
+
         try {
-            // 1. 从AI评分结果中提取错误的知识点
-            List<String> weakKnowledgePoints = extractWeakKnowledgePoints(aiResponse, questionBank);
-            log.info("识别出{}个薄弱知识点", weakKnowledgePoints.size());
+            // 调用AI服务生成教学计划
+            String aiResponse = deepSeekService.chat(prompt);
+            log.info("AI响应内容: {}", aiResponse);
             
-            // 2. 构建教学计划生成的提示词
-            String prompt = buildTeachingPlanPrompt(weakKnowledgePoints, aiResponse);
+            // 清理AI响应中的markdown代码块标记和重复字段
+            aiResponse = cleanJsonResponse(aiResponse);
             
-            // 3. 调用AI生成教学计划
-            String planResponse = deepSeekService.chat(prompt);
+            // 创建教学计划对象
+            TeachingPlan teachingPlan = new TeachingPlan();
+            teachingPlan.setQuestionBankId(questionBank.getId());
+            teachingPlan.setUserId(questionBank.getUserId());
+            teachingPlan.setSubject(questionBank.getSubject());
             
-            // 4. 解析AI返回的教学计划
-            TeachingPlan teachingPlan = parseTeachingPlan(planResponse, questionBank, userAnswerVO);
-            log.info("成功生成教学计划，用户ID: {}, 题库ID: {}", questionBank.getUserId(), questionBank.getId());
+            // 设置用户答题记录ID
+            teachingPlan.setUserAnswerId(userAnswerId);
             
+            // 尝试解析JSON响应
+            try {
+                JSONObject responseJson = JSONUtil.parseObj(aiResponse);
+                
+                // 设置知识点列表 - 从题库问题中提取知识点
+                List<String> knowledgePoints = new ArrayList<>();
+                
+                // 获取题库中的问题关联
+                List<QuestionBankQuestion> questionBankQuestions = questionBankQuestionService.list(
+                    new LambdaQueryWrapper<QuestionBankQuestion>()
+                        .eq(QuestionBankQuestion::getQuestionBankId, questionBank.getId())
+                );
+                
+                if (!questionBankQuestions.isEmpty()) {
+                    // 获取所有题目ID
+                    List<Long> questionIds = questionBankQuestions.stream()
+                        .map(QuestionBankQuestion::getQuestionId)
+                        .collect(Collectors.toList());
+                    
+                    // 获取题目详情
+                    List<Question> questions = questionService.listByIds(questionIds);
+                    
+                    // 从题目中提取知识点标签
+                    for (Question question : questions) {
+                        if (StrUtil.isNotBlank(question.getTagsStr())) {
+                            try {
+                                JSONArray tags = JSONUtil.parseArray(question.getTagsStr());
+                                for (int i = 0; i < tags.size(); i++) {
+                                    knowledgePoints.add(tags.getStr(i));
+                                }
+                            } catch (Exception e) {
+                                log.warn("解析问题标签失败: {}", question.getTagsStr());
+                            }
+                        }
+                    }
+                }
+                
+                // 去重并设置知识点
+                knowledgePoints = knowledgePoints.stream().distinct().collect(Collectors.toList());
+                teachingPlan.setKnowledgePoints(knowledgePoints);
+                
+                // 设置知识点分析
+                if (responseJson.containsKey("knowledgeAnalysis")) {
+                    teachingPlan.setKnowledgeAnalysis(responseJson.getJSONObject("knowledgeAnalysis"));
+                } else {
+                    JSONObject defaultAnalysis = new JSONObject();
+                    defaultAnalysis.set("masteryLevel", "知识点掌握情况未分析");
+                    defaultAnalysis.set("commonProblems", "未发现普遍问题");
+                    defaultAnalysis.set("errorAnalysis", "未进行错误分析");
+                    teachingPlan.setKnowledgeAnalysis(defaultAnalysis);
+                }
+                
+                // 设置教学目标
+                if (responseJson.containsKey("teachingObjectives")) {
+                    teachingPlan.setTeachingObjectives(responseJson.getJSONArray("teachingObjectives"));
+                } else {
+                    JSONArray defaultObjectives = new JSONArray();
+                    JSONObject objective = new JSONObject();
+                    objective.set("type", "知识");
+                    objective.set("content", "教学目标未生成");
+                    defaultObjectives.add(objective);
+                    teachingPlan.setTeachingObjectives(defaultObjectives);
+                }
+                
+                // 设置教学安排
+                if (responseJson.containsKey("teachingArrangement")) {
+                    teachingPlan.setTeachingArrangement(responseJson.getJSONArray("teachingArrangement"));
+                } else {
+                    JSONArray defaultArrangement = new JSONArray();
+                    JSONObject arrangement = new JSONObject();
+                    arrangement.set("stage", "教学阶段");
+                    arrangement.set("duration", "时长");
+                    arrangement.set("content", "教学安排未生成");
+                    arrangement.set("methods", new JSONArray());
+                    arrangement.set("materials", new JSONArray());
+                    arrangement.set("activities", new JSONArray());
+                    defaultArrangement.add(arrangement);
+                    teachingPlan.setTeachingArrangement(defaultArrangement);
+                }
+                
+                // 设置预期成果
+                if (responseJson.containsKey("expectedOutcomes")) {
+                    teachingPlan.setExpectedOutcomes(responseJson.getJSONObject("expectedOutcomes"));
+                } else {
+                    JSONObject defaultOutcomes = new JSONObject();
+                    defaultOutcomes.set("knowledge", "预期知识成果未生成");
+                    defaultOutcomes.set("skills", "预期技能成果未生成");
+                    defaultOutcomes.set("attitudes", "预期态度成果未生成");
+                    teachingPlan.setExpectedOutcomes(defaultOutcomes);
+                }
+                
+                // 设置评估方法
+                if (responseJson.containsKey("evaluationMethods")) {
+                    teachingPlan.setEvaluationMethods(responseJson.getJSONArray("evaluationMethods"));
+                } else {
+                    JSONArray defaultMethods = new JSONArray();
+                    JSONObject method = new JSONObject();
+                    method.set("type", "评估方法");
+                    method.set("description", "评估方法未生成");
+                    defaultMethods.add(method);
+                    teachingPlan.setEvaluationMethods(defaultMethods);
+                }
+            } catch (Exception e) {
+                log.error("解析AI响应失败，使用默认值", e);
+                // 设置默认值
+                JSONObject defaultAnalysis = new JSONObject();
+                defaultAnalysis.set("masteryLevel", "知识点掌握情况未分析");
+                defaultAnalysis.set("commonProblems", "未发现普遍问题");
+                defaultAnalysis.set("errorAnalysis", "未进行错误分析");
+                teachingPlan.setKnowledgeAnalysis(defaultAnalysis);
+                
+                JSONArray defaultObjectives = new JSONArray();
+                JSONObject objective = new JSONObject();
+                objective.set("type", "知识");
+                objective.set("content", "教学目标未生成");
+                defaultObjectives.add(objective);
+                teachingPlan.setTeachingObjectives(defaultObjectives);
+                
+                JSONArray defaultArrangement = new JSONArray();
+                JSONObject arrangement = new JSONObject();
+                arrangement.set("stage", "教学阶段");
+                arrangement.set("duration", "时长");
+                arrangement.set("content", "教学安排未生成");
+                arrangement.set("methods", new JSONArray());
+                arrangement.set("materials", new JSONArray());
+                arrangement.set("activities", new JSONArray());
+                defaultArrangement.add(arrangement);
+                teachingPlan.setTeachingArrangement(defaultArrangement);
+                
+                JSONObject defaultOutcomes = new JSONObject();
+                defaultOutcomes.set("knowledge", "预期知识成果未生成");
+                defaultOutcomes.set("skills", "预期技能成果未生成");
+                defaultOutcomes.set("attitudes", "预期态度成果未生成");
+                teachingPlan.setExpectedOutcomes(defaultOutcomes);
+                
+                JSONArray defaultMethods = new JSONArray();
+                JSONObject method = new JSONObject();
+                method.set("type", "评估方法");
+                method.set("description", "评估方法未生成");
+                defaultMethods.add(method);
+                teachingPlan.setEvaluationMethods(defaultMethods);
+
+                // 设置默认知识点列表
+                teachingPlan.setKnowledgePoints("[]");
+            }
+
+            // 保存教学计划
+            save(teachingPlan);
             return teachingPlan;
         } catch (Exception e) {
             log.error("生成教学计划失败", e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成教学计划失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教学计划失败");
         }
+    }
+
+    private String buildTeachingPlanPrompt(QuestionBank questionBank, List<QuestionScoringResult> scoringResults) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("请根据以下信息生成一个教学计划，并严格按照指定的JSON格式返回：\n\n");
+        prompt.append("题库信息：\n");
+        prompt.append("- 学科：").append(questionBank.getSubject()).append("\n");
+        prompt.append("- 题目数量：").append(questionBank.getQuestionCount()).append("\n\n");
+        
+        prompt.append("评分结果：\n");
+        for (QuestionScoringResult result : scoringResults) {
+            prompt.append("- 题目ID：").append(result.getQuestionId()).append("\n");
+            prompt.append("  得分：").append(result.getScore()).append("\n");
+            prompt.append("  分析：").append(result.getAnalysis()).append("\n\n");
+        }
+        
+        prompt.append("请严格按照以下JSON格式返回（注意：所有字段都必须存在，且格式必须完全匹配）：\n");
+        prompt.append("{\n");
+        prompt.append("  \"knowledgeAnalysis\": {\n");
+        prompt.append("    \"masteryLevel\": \"知识点掌握情况\",\n");
+        prompt.append("    \"commonProblems\": \"普遍存在的问题\",\n");
+        prompt.append("    \"errorAnalysis\": \"错误原因分析\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"teachingObjectives\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"type\": \"知识/能力/情感\",\n");
+        prompt.append("      \"content\": \"具体目标\"\n");
+        prompt.append("    }\n");
+        prompt.append("  ],\n");
+        prompt.append("  \"teachingArrangement\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"stage\": \"教学阶段\",\n");
+        prompt.append("      \"duration\": \"时长\",\n");
+        prompt.append("      \"content\": \"具体内容\",\n");
+        prompt.append("      \"methods\": [\"教学方法\"],\n");
+        prompt.append("      \"materials\": [\"教学资源\"],\n");
+        prompt.append("      \"activities\": [\"教学活动\"]\n");
+        prompt.append("    }\n");
+        prompt.append("  ],\n");
+        prompt.append("  \"expectedOutcomes\": {\n");
+        prompt.append("    \"knowledge\": \"知识掌握目标\",\n");
+        prompt.append("    \"skills\": \"技能提升目标\",\n");
+        prompt.append("    \"attitudes\": \"态度改善目标\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"evaluationMethods\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"type\": \"评估方法类型\",\n");
+        prompt.append("      \"description\": \"具体描述\"\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
+        prompt.append("}\n\n");
+        
+        prompt.append("注意事项：\n");
+        prompt.append("1. 必须严格按照上述JSON格式返回\n");
+        prompt.append("2. 所有字段都必须存在\n");
+        prompt.append("3. 不要添加任何额外的字段\n");
+        prompt.append("4. 确保所有字符串都使用双引号\n");
+        prompt.append("5. 确保所有数组和对象都正确闭合\n");
+        prompt.append("6. 不要在JSON中包含任何注释或说明文字\n");
+        prompt.append("7. 确保所有数值都是有效的JSON格式\n");
+        prompt.append("8. 不要使用任何特殊字符或转义字符\n");
+
+        return prompt.toString();
     }
 
     /**
@@ -112,9 +352,22 @@ public class TeachingPlanGenerationServiceImpl implements TeachingPlanGeneration
      * 清理JSON响应文本
      */
     private String cleanJsonResponse(String response) {
-        return response.replaceAll("```json\\s*", "")
-                     .replaceAll("```\\s*", "")
-                     .trim();
+        if (response == null) {
+            return "{}";
+        }
+        // 移除markdown代码块标记
+        response = response.replaceAll("```json\\s*", "")
+                         .replaceAll("```\\s*", "")
+                         .trim();
+        // 确保响应以{开头
+        if (!response.startsWith("{")) {
+            response = "{" + response;
+        }
+        // 确保响应以}结尾
+        if (!response.endsWith("}")) {
+            response = response + "}";
+        }
+        return response;
     }
     
     /**
@@ -148,104 +401,115 @@ public class TeachingPlanGenerationServiceImpl implements TeachingPlanGeneration
     /**
      * 构建生成教学计划的提示词
      */
-    private String buildTeachingPlanPrompt(List<String> weakPoints, String aiResponse) {
+    private String buildPrompt(QuestionBank questionBank, UserAnswerVO userAnswerVO, List<String> weakKnowledgePoints) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("请根据以下信息生成一份详细的教学教案：\n\n");
         
-        // 添加薄弱知识点信息
-        if (!weakPoints.isEmpty()) {
-            prompt.append("1. 学生在以下知识点表现欠佳：").append(String.join("、", weakPoints)).append("\n\n");
-        } else {
-            prompt.append("1. 学生普遍表现良好，但需要巩固已学知识\n\n");
+        // 添加基本信息
+        prompt.append("你是一位经验丰富的教师，请根据以下信息生成一份详细的教学计划：\n\n");
+        prompt.append("1. 题库信息：\n");
+        prompt.append("   - 名称：").append(questionBank.getTitle()).append("\n");
+        prompt.append("   - 类型：").append(questionBank.getQuestionBankType() == 0 ? "单选题" : 
+                                          questionBank.getQuestionBankType() == 1 ? "多选题" :
+                                          questionBank.getQuestionBankType() == 2 ? "填空题" : "简答题").append("\n");
+        prompt.append("   - 评分策略：").append(questionBank.getScoringStrategy() == 0 ? "自定义" : "AI").append("\n");
+        prompt.append("   - 总分：").append(questionBank.getTotalScore()).append("\n");
+        prompt.append("   - 及格分：").append(questionBank.getPassScore()).append("\n");
+        prompt.append("   - 学科：").append(questionBank.getSubject()).append("\n");
+        
+        // 添加题目信息
+        prompt.append("\n2. 答题信息：\n");
+        prompt.append("   - 得分：").append(userAnswerVO.getResultScore()).append("\n");
+        prompt.append("   - 答案：").append(userAnswerVO.getChoices()).append("\n");
+        prompt.append("   - 结果描述：").append(userAnswerVO.getResultDesc()).append("\n");
+        
+        // 添加薄弱知识点
+        prompt.append("\n3. 学生薄弱知识点：\n");
+        for (String point : weakKnowledgePoints) {
+            prompt.append("   - ").append(point).append("\n");
         }
         
-        // 添加题目分析信息
-        prompt.append("2. 具体题目分析：").append(aiResponse).append("\n\n");
+        // 添加教学计划要求
+        prompt.append("\n请生成一份详细的教学计划，包含以下内容：\n");
+        prompt.append("1. 知识点分析：\n");
+        prompt.append("   - 分析每个知识点的掌握情况\n");
+        prompt.append("   - 找出学生普遍存在的问题\n");
+        prompt.append("   - 分析错误原因\n\n");
         
-        // 从分析中提取学科信息
-        String subject = extractSubjectFromAnalysis(aiResponse);
+        prompt.append("2. 教学目标：\n");
+        prompt.append("   - 知识目标：具体要掌握的知识点\n");
+        prompt.append("   - 能力目标：要培养的能力\n");
+        prompt.append("   - 情感目标：学习态度和习惯的培养\n\n");
         
-        // 添加学科特定的指导
-        if (subject != null) {
-            prompt.append("3. 本次教学针对的是").append(subject).append("学科，请确保教案内容与").append(subject).append("学科的教学特点和方法相符合。\n\n");
-            
-            // 为不同学科添加特定的教学建议
-            if (subject.contains("数学")) {
-                prompt.append("数学教学建议：\n");
-                prompt.append("- 注重概念理解和公式推导过程\n");
-                prompt.append("- 强调逻辑思维和解题策略\n");
-                prompt.append("- 设计由浅入深的例题和练习\n");
-                prompt.append("- 鼓励学生进行数学思维的表达与交流\n\n");
-            } else if (subject.contains("语文")) {
-                prompt.append("语文教学建议：\n");
-                prompt.append("- 注重语言表达和文学欣赏能力的培养\n");
-                prompt.append("- 结合阅读理解和写作训练\n");
-                prompt.append("- 鼓励学生进行文本分析和思想交流\n");
-                prompt.append("- 培养学生的人文素养和批判性思维\n\n");
-            } else if (subject.contains("英语")) {
-                prompt.append("英语教学建议：\n");
-                prompt.append("- 创设真实的语言环境和交际情境\n");
-                prompt.append("- 平衡听说读写四项技能的训练\n");
-                prompt.append("- 注重语言实际运用和跨文化理解\n");
-                prompt.append("- 采用多样化的教学活动提高学习兴趣\n\n");
-            } else if (subject.contains("物理")) {
-                prompt.append("物理教学建议：\n");
-                prompt.append("- 结合实验和演示帮助理解物理概念\n");
-                prompt.append("- 强调公式背后的物理意义\n");
-                prompt.append("- 培养学生的科学思维和问题解决能力\n");
-                prompt.append("- 联系实际生活现象解释物理原理\n\n");
-            } else if (subject.contains("化学")) {
-                prompt.append("化学教学建议：\n");
-                prompt.append("- 通过实验观察和操作加深对化学反应的理解\n");
-                prompt.append("- 强调化学用语和符号的规范使用\n");
-                prompt.append("- 注重化学计算能力的培养\n");
-                prompt.append("- 探讨化学与生活、环境的联系\n\n");
-            } else if (subject.contains("生物")) {
-                prompt.append("生物教学建议：\n");
-                prompt.append("- 结合图片、模型和显微观察等直观教学手段\n");
-                prompt.append("- 强调生物学概念和原理的理解\n");
-                prompt.append("- 培养学生的科学探究能力\n");
-                prompt.append("- 讨论生物学与健康、环境的关系\n\n");
-            } else if (subject.contains("历史")) {
-                prompt.append("历史教学建议：\n");
-                prompt.append("- 通过历史事件和人物分析历史发展规律\n");
-                prompt.append("- 培养学生的史料分析和历史思维能力\n");
-                prompt.append("- 注重历史事件的因果关系和历史评价\n");
-                prompt.append("- 引导学生从历史中汲取智慧\n\n");
-            } else if (subject.contains("地理")) {
-                prompt.append("地理教学建议：\n");
-                prompt.append("- 结合地图、图表和实例进行地理现象分析\n");
-                prompt.append("- 培养学生的空间思维和地理观察能力\n");
-                prompt.append("- 探讨自然地理与人文地理的相互关系\n");
-                prompt.append("- 关注地理环境与可持续发展\n\n");
-            } else if (subject.contains("政治") || subject.contains("思想")) {
-                prompt.append("思想政治教学建议：\n");
-                prompt.append("- 结合时事热点和社会现实进行教学\n");
-                prompt.append("- 培养学生的政治素养和价值判断能力\n");
-                prompt.append("- 鼓励多角度思考和理性讨论\n");
-                prompt.append("- 引导学生形成正确的世界观、人生观和价值观\n\n");
-            }
-        }
+        prompt.append("3. 教学安排：\n");
+        prompt.append("   - 课前准备：教师和学生需要准备的内容\n");
+        prompt.append("   - 课堂流程：\n");
+        prompt.append("     * 导入环节（5分钟）：复习旧知，引入新课\n");
+        prompt.append("     * 知识讲解（20分钟）：重点讲解薄弱知识点\n");
+        prompt.append("     * 错题分析（15分钟）：分析典型错题，总结解题方法\n");
+        prompt.append("     * 练习巩固（15分钟）：针对性练习\n");
+        prompt.append("     * 总结提升（5分钟）：归纳总结，布置作业\n");
+        prompt.append("   - 教学方法：具体使用的教学方法\n");
+        prompt.append("   - 教学资源：需要使用的教具、课件等\n\n");
         
-        // 指定返回格式
-        prompt.append("请生成一份包含以下内容的详细教案，以JSON格式返回：\n");
+        prompt.append("4. 错题解决方案：\n");
+        prompt.append("   - 针对每道错题的具体解决方案\n");
+        prompt.append("   - 解题思路和方法的指导\n");
+        prompt.append("   - 常见错误的预防措施\n\n");
+        
+        prompt.append("5. 预期成果：\n");
+        prompt.append("   - 知识掌握程度\n");
+        prompt.append("   - 能力提升目标\n");
+        prompt.append("   - 学习态度改善\n\n");
+        
+        prompt.append("6. 评估方法：\n");
+        prompt.append("   - 课堂表现评估\n");
+        prompt.append("   - 作业完成情况\n");
+        prompt.append("   - 测试成绩评估\n");
+        
+        prompt.append("\n请以JSON格式返回，包含以下字段：\n");
         prompt.append("{\n");
-        prompt.append("  \"knowledgeAnalysis\": \"知识点分析和学生存在的问题\",\n");
+        prompt.append("  \"knowledgeAnalysis\": {\n");
+        prompt.append("    \"masteryLevel\": \"知识点掌握情况\",\n");
+        prompt.append("    \"commonProblems\": \"普遍存在的问题\",\n");
+        prompt.append("    \"errorAnalysis\": \"错误原因分析\"\n");
+        prompt.append("  },\n");
         prompt.append("  \"teachingDesign\": {\n");
-        prompt.append("    \"teachingObjectives\": \"教学目标\",\n");
+        prompt.append("    \"teachingObjectives\": [\n");
+        prompt.append("      {\n");
+        prompt.append("        \"type\": \"知识/能力/情感\",\n");
+        prompt.append("        \"content\": \"具体目标\"\n");
+        prompt.append("      }\n");
+        prompt.append("    ],\n");
         prompt.append("    \"teachingArrangement\": [\n");
         prompt.append("      {\n");
-        prompt.append("        \"stage\": \"教学阶段名称\",\n");
-        prompt.append("        \"duration\": \"时间分配（分钟）\",\n");
-        prompt.append("        \"activities\": \"具体教学活动安排\",\n");
-        prompt.append("        \"methods\": \"教学方法\",\n");
-        prompt.append("        \"materials\": \"教学材料和工具\"\n");
+        prompt.append("        \"stage\": \"教学阶段\",\n");
+        prompt.append("        \"duration\": \"时长\",\n");
+        prompt.append("        \"content\": \"具体内容\",\n");
+        prompt.append("        \"methods\": [\"教学方法\"],\n");
+        prompt.append("        \"materials\": [\"教学资源\"],\n");
+        prompt.append("        \"activities\": [\"教学活动\"]\n");
         prompt.append("      }\n");
         prompt.append("    ]\n");
         prompt.append("  },\n");
-        prompt.append("  \"expectedOutcomes\": \"预期学习成果\",\n");
-        prompt.append("  \"evaluationMethods\": \"评估方法\"\n");
-        prompt.append("}\n");
+        prompt.append("  \"errorSolutions\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"questionId\": \"题目ID\",\n");
+        prompt.append("      \"problem\": \"问题描述\",\n");
+        prompt.append("      \"solution\": \"解决方案\",\n");
+        prompt.append("      \"prevention\": \"预防措施\"\n");
+        prompt.append("    }\n");
+        prompt.append("  ],\n");
+        prompt.append("  \"expectedOutcomes\": {\n");
+        prompt.append("    \"knowledge\": \"知识掌握目标\",\n");
+        prompt.append("    \"ability\": \"能力提升目标\",\n");
+        prompt.append("    \"attitude\": \"态度改善目标\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"evaluationMethods\": {\n");
+        prompt.append("    \"classroom\": \"课堂表现评估\",\n");
+        prompt.append("    \"homework\": \"作业评估\",\n");
+        prompt.append("    \"test\": \"测试评估\"\n");
+        prompt.append("  }\n");
+        prompt.append("}");
         
         return prompt.toString();
     }
@@ -307,32 +571,142 @@ public class TeachingPlanGenerationServiceImpl implements TeachingPlanGeneration
         try {
             // 清理响应文本
             aiResponse = cleanJsonResponse(aiResponse);
-            JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
             
+            // 记录原始响应以便调试
+            log.debug("AI响应原始内容: {}", aiResponse);
+            
+            // 尝试修复常见的JSON格式问题
+            aiResponse = aiResponse.replaceAll("(?m),\\s*}", "}")  // 移除对象末尾多余的逗号
+                                 .replaceAll("(?m),\\s*]", "]")   // 移除数组末尾多余的逗号
+                                 .replaceAll("(?m)\\s*,\\s*}", "}")  // 修复对象末尾的逗号
+                                 .replaceAll("(?m)\\s*,\\s*]", "]"); // 修复数组末尾的逗号
+            
+            // 确保JSON格式正确
+            if (!aiResponse.startsWith("{")) {
+                aiResponse = "{" + aiResponse;
+            }
+            if (!aiResponse.endsWith("}")) {
+                aiResponse = aiResponse + "}";
+            }
+            
+            // 解析JSON
+        JSONObject jsonResponse = JSONUtil.parseObj(aiResponse);
+        
             // 创建教学计划对象
-            TeachingPlan teachingPlan = new TeachingPlan();
-            teachingPlan.setQuestionBankId(questionBank.getId());
-            teachingPlan.setUserId(questionBank.getUserId());
-            teachingPlan.setUserAnswerId(userAnswerVO.getId());
+        TeachingPlan teachingPlan = new TeachingPlan();
+        teachingPlan.setQuestionBankId(questionBank.getId());
+        teachingPlan.setUserId(questionBank.getUserId());
+            teachingPlan.setUserAnswerId(questionBank.getUserId());
+            
+            // 设置学科
+            teachingPlan.setSubject(questionBank.getSubject());
+            
+            // 设置知识点列表
+            List<String> knowledgePoints = new ArrayList<>();
+            List<QuestionVO> questions = questionBankService.getQuestionsByBankId(questionBank.getId());
+            for (QuestionVO question : questions) {
+                if (question.getTags() != null) {
+                    JSONArray tags = JSONUtil.parseArray(question.getTags());
+                    for (int i = 0; i < tags.size(); i++) {
+                        knowledgePoints.add(tags.getStr(i));
+                    }
+                }
+            }
+            // 去重
+            knowledgePoints = knowledgePoints.stream().distinct().collect(Collectors.toList());
+            teachingPlan.setKnowledgePoints(knowledgePoints);
             
             // 设置知识点分析
-            teachingPlan.setKnowledgeAnalysis(jsonResponse.getStr("knowledgeAnalysis"));
+            if (jsonResponse.containsKey("knowledgeAnalysis")) {
+                teachingPlan.setKnowledgeAnalysis(jsonResponse.get("knowledgeAnalysis"));
+            } else {
+                log.warn("AI响应中缺少knowledgeAnalysis字段");
+                JSONObject defaultAnalysis = new JSONObject();
+                defaultAnalysis.set("masteryLevel", "知识点掌握情况未分析");
+                defaultAnalysis.set("commonProblems", "未发现普遍问题");
+                defaultAnalysis.set("errorAnalysis", "未进行错误分析");
+                teachingPlan.setKnowledgeAnalysis(defaultAnalysis);
+            }
             
             // 设置教学设计
-            JSONObject teachingDesign = jsonResponse.getJSONObject("teachingDesign");
-            if (teachingDesign != null) {
-                teachingPlan.setTeachingObjectives(teachingDesign.getStr("teachingObjectives"));
-                JSONArray arrangement = teachingDesign.getJSONArray("teachingArrangement");
-                teachingPlan.setTeachingArrangement(JSONUtil.toJsonStr(arrangement));
+            if (jsonResponse.containsKey("teachingDesign")) {
+                JSONObject teachingDesign = jsonResponse.getJSONObject("teachingDesign");
+                if (teachingDesign != null) {
+                    if (teachingDesign.containsKey("teachingObjectives")) {
+                        teachingPlan.setTeachingObjectives(teachingDesign.get("teachingObjectives"));
+                    } else {
+                        log.warn("teachingDesign中缺少teachingObjectives字段");
+                        JSONArray defaultObjectives = new JSONArray();
+                        JSONObject objective = new JSONObject();
+                        objective.set("type", "知识");
+                        objective.set("content", "教学目标未生成");
+                        defaultObjectives.add(objective);
+                        teachingPlan.setTeachingObjectives(defaultObjectives);
+                    }
+                    
+                    if (teachingDesign.containsKey("teachingArrangement")) {
+                        teachingPlan.setTeachingArrangement(teachingDesign.get("teachingArrangement"));
+                    } else {
+                        log.warn("teachingDesign中缺少teachingArrangement字段");
+                        JSONArray defaultArrangement = new JSONArray();
+                        JSONObject arrangement = new JSONObject();
+                        arrangement.set("stage", "教学阶段");
+                        arrangement.set("duration", "时长");
+                        arrangement.set("content", "教学安排未生成");
+                        arrangement.set("methods", new JSONArray());
+                        arrangement.set("materials", new JSONArray());
+                        arrangement.set("activities", new JSONArray());
+                        defaultArrangement.add(arrangement);
+                        teachingPlan.setTeachingArrangement(defaultArrangement);
+                    }
+                }
+            } else {
+                log.warn("AI响应中缺少teachingDesign字段");
+                JSONArray defaultObjectives = new JSONArray();
+                JSONObject objective = new JSONObject();
+                objective.set("type", "知识");
+                objective.set("content", "教学目标未生成");
+                defaultObjectives.add(objective);
+                teachingPlan.setTeachingObjectives(defaultObjectives);
+                
+                JSONArray defaultArrangement = new JSONArray();
+                JSONObject arrangement = new JSONObject();
+                arrangement.set("stage", "教学阶段");
+                arrangement.set("duration", "时长");
+                arrangement.set("content", "教学安排未生成");
+                arrangement.set("methods", new JSONArray());
+                arrangement.set("materials", new JSONArray());
+                arrangement.set("activities", new JSONArray());
+                defaultArrangement.add(arrangement);
+                teachingPlan.setTeachingArrangement(defaultArrangement);
             }
             
             // 设置预期成果和评估方法
-            teachingPlan.setExpectedOutcomes(jsonResponse.getStr("expectedOutcomes"));
-            teachingPlan.setEvaluationMethods(jsonResponse.getStr("evaluationMethods"));
+            if (jsonResponse.containsKey("expectedOutcomes")) {
+                teachingPlan.setExpectedOutcomes(jsonResponse.get("expectedOutcomes"));
+            } else {
+                log.warn("AI响应中缺少expectedOutcomes字段");
+                JSONObject defaultOutcomes = new JSONObject();
+                defaultOutcomes.set("knowledge", "知识掌握目标未设定");
+                defaultOutcomes.set("ability", "能力提升目标未设定");
+                defaultOutcomes.set("attitude", "态度改善目标未设定");
+                teachingPlan.setExpectedOutcomes(defaultOutcomes);
+            }
             
-            return teachingPlan;
+            if (jsonResponse.containsKey("evaluationMethods")) {
+                teachingPlan.setEvaluationMethods(jsonResponse.get("evaluationMethods"));
+            } else {
+                log.warn("AI响应中缺少evaluationMethods字段");
+                JSONObject defaultMethods = new JSONObject();
+                defaultMethods.set("classroom", "课堂表现评估方法未设定");
+                defaultMethods.set("homework", "作业评估方法未设定");
+                defaultMethods.set("test", "测试评估方法未设定");
+                teachingPlan.setEvaluationMethods(defaultMethods);
+            }
+        
+        return teachingPlan;
         } catch (Exception e) {
-            log.error("解析教学计划失败", e);
+            log.error("解析教学计划失败，原始响应: {}", aiResponse, e);
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "解析教学计划失败：" + e.getMessage());
         }
     }

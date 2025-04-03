@@ -25,6 +25,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 题库接口
@@ -219,5 +220,20 @@ public class QuestionBankController {
         Long userId = userService.getLoginUser(request).getId();
         List<ScoringResultVO> history = questionBankService.getScoringHistory(questionBankId, userId);
         return ResultUtils.success(history);
+    }
+
+    /**
+     * 获取学情分析
+     */
+    @GetMapping("/learning-analysis")
+    public BaseResponse<Map<String, Object>> getLearningAnalysis(
+            @RequestParam Long questionBankId,
+            HttpServletRequest request) {
+        if (questionBankId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Long userId = userService.getLoginUser(request).getId();
+        Map<String, Object> analysis = questionBankService.getLearningAnalysis(questionBankId, userId);
+        return ResultUtils.success(analysis);
     }
 }

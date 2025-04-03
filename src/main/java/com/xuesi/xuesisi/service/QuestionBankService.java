@@ -8,6 +8,7 @@ import com.xuesi.xuesisi.model.vo.QuestionVO;
 import com.xuesi.xuesisi.model.vo.ScoringResultVO;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 题库服务接口
@@ -97,4 +98,13 @@ public interface QuestionBankService extends IService<QuestionBank> {
      * @return 统计信息
      */
     QuestionBankVO getQuestionBankStats(Long questionBankId);
+
+    /**
+     * 获取学情分析
+     *
+     * @param questionBankId 题库ID
+     * @param userId        用户ID
+     * @return 学情分析数据
+     */
+    Map<String, Object> getLearningAnalysis(Long questionBankId, Long userId);
 }

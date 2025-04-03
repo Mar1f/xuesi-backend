@@ -45,7 +45,11 @@ public class LearningAnalysisServiceImpl extends ServiceImpl<LearningAnalysisMap
     @Override
     public LearningAnalysis getLearningAnalysis(Long userId, Long classId) {
         QueryWrapper<LearningAnalysis> query = new QueryWrapper<>();
-        query.eq("userId", userId).eq("classId", classId);
+        query.eq("user_id", userId)
+             .eq("class_id", classId)
+             .eq("isDelete", 0)
+             .orderByDesc("create_time")
+             .last("LIMIT 1");
         return getOne(query);
     }
 

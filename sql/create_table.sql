@@ -235,22 +235,24 @@ USE `xuesisi`;
 
 
 CREATE TABLE IF NOT EXISTS `teaching_plan` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `question_bank_id` bigint NOT NULL COMMENT '题库ID',
-    `user_id` bigint NOT NULL COMMENT '用户ID',
-    `user_answer_id` bigint NOT NULL COMMENT '用户答题ID',
-   `knowledge_analysis` text COMMENT '知识点分析',
-   `teaching_objectives` text COMMENT '教学目标',
-   `teaching_arrangement` json COMMENT '教学安排（JSON格式）',
-   `expected_outcomes` text COMMENT '预期学习成果',
-   `evaluation_methods` text COMMENT '评估方法',
-   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-   `isDelete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
-   PRIMARY KEY (`id`),
-   KEY `idx_user_answer_id` (`user_answer_id`),
-   KEY `idx_user_id` (`user_id`),
-   KEY `idx_question_bank_id` (`question_bank_id`)
+       `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+       `question_bank_id` bigint NOT NULL COMMENT '题库ID',
+       `user_id` bigint NOT NULL COMMENT '用户ID',
+       `user_answer_id` bigint NOT NULL COMMENT '用户答题ID',
+       `knowledge_analysis` json COMMENT '知识点分析（JSON格式）',
+       `teaching_objectives` json COMMENT '教学目标（JSON格式）',
+       `teaching_arrangement` json COMMENT '教学安排（JSON格式）',
+       `expected_outcomes` json COMMENT '预期学习成果（JSON格式）',
+       `evaluation_methods` json COMMENT '评估方法（JSON格式）',
+        `subject` VARCHAR(50) COMMENT '学科',
+       `knowledge_points` JSON COMMENT '知识点列表',
+       `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+       `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+       `isDelete` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除',
+       PRIMARY KEY (`id`),
+       KEY `idx_user_answer_id` (`user_answer_id`),
+       KEY `idx_user_id` (`user_id`),
+       KEY `idx_question_bank_id` (`question_bank_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='教学教案表';
-
+USE `xuesisi`;
 

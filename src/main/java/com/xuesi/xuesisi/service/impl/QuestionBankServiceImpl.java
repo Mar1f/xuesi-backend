@@ -3028,4 +3028,190 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
             return jsonStr;
         }
     }
+
+    @Override
+    public Map<String, Object> getLearningAnalysis(Long questionBankId, Long userId) {
+        // 参数校验
+        if (questionBankId == null || userId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        // 获取用户在该题库的所有评分结果
+        List<ScoringResult> scoringResults = scoringResultService.list(
+            new LambdaQueryWrapper<ScoringResult>()
+                .eq(ScoringResult::getQuestionBankId, questionBankId)
+                .eq(ScoringResult::getUserId, userId)
+                .eq(ScoringResult::getStatus, 1) // 只统计已完成的
+                .orderByDesc(ScoringResult::getCreateTime)
+        );
+
+        if (scoringResults.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "未找到相关学习记录");
+        }
+
+        // 获取最新的评分结果
+        ScoringResult latestResult = scoringResults.get(0);
+
+        // 获取题库信息
+        QuestionBank questionBank = getById(questionBankId);
+        if (questionBank == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题库不存在");
+        }
+
+        // 获取题库中的所有题目
+        List<QuestionVO> questionVOs = getQuestionsByBankId(questionBankId);
+        if (questionVOs.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题库中没有题目");
+        }
+
+        // 获取用户答案
+        List<UserAnswer> userAnswers = userAnswerService.list(
+            new LambdaQueryWrapper<UserAnswer>()
+                .eq(UserAnswer::getResultId, latestResult.getId())
+        );
+
+        // 构建学情分析数据
+        Map<String, Object> analysisData = new HashMap<>();
+        
+        // 1. 基本信息
+        analysisData.put("questionBankTitle", questionBank.getTitle());
+        analysisData.put("totalScore", latestResult.getScore());
+        analysisData.put("completionTime", latestResult.getCreateTime());
+        analysisData.put("questionCount", questionVOs.size());
+        
+        // 2. 答题正确率统计
+        int correctCount = 0;
+        int partialCorrectCount = 0;
+        for (UserAnswer answer : userAnswers) {
+            if (answer.getResultScore() >= 100) {
+                correctCount++;
+            } else if (answer.getResultScore() > 0) {
+                partialCorrectCount++;
+            }
+        }
+        
+        Map<String, Object> accuracyStats = new HashMap<>();
+        accuracyStats.put("correctCount", correctCount);
+        accuracyStats.put("partialCorrectCount", partialCorrectCount);
+        accuracyStats.put("incorrectCount", userAnswers.size() - correctCount - partialCorrectCount);
+        accuracyStats.put("correctRate", String.format("%.2f%%", (double)correctCount / userAnswers.size() * 100));
+        analysisData.put("accuracyStats", accuracyStats);
+        
+        // 3. 知识点掌握情况分析
+        Map<String, KnowledgePointStats> knowledgePointMap = new HashMap<>();
+        for (QuestionVO question : questionVOs) {
+            // 获取题目的知识点
+            List<String> knowledgeTags = question.getTags();
+            if (knowledgeTags != null) {
+                for (String tag : knowledgeTags) {
+                    KnowledgePointStats stats = knowledgePointMap.computeIfAbsent(tag, 
+                        k -> new KnowledgePointStats(tag));
+                    
+                    // 查找对应的用户答案
+                    Optional<UserAnswer> userAnswer = userAnswers.stream()
+                        .filter(a -> a.getQuestionBankId().equals(question.getId()))
+                        .findFirst();
+                    
+                    if (userAnswer.isPresent()) {
+                        stats.addQuestion(question, userAnswer.get());
+                    }
+                }
+            }
+        }
+        
+        // 转换知识点统计为前端所需格式
+        List<Map<String, Object>> knowledgePointAnalysis = knowledgePointMap.values().stream()
+            .map(stats -> {
+                Map<String, Object> pointStats = new HashMap<>();
+                pointStats.put("knowledgePoint", stats.getKnowledgePoint());
+                pointStats.put("questionCount", stats.getQuestionCount());
+                pointStats.put("correctCount", stats.getCorrectCount());
+                pointStats.put("masteryRate", String.format("%.2f%%", stats.getMasteryRate() * 100));
+                pointStats.put("needsImprovement", stats.getMasteryRate() < 0.6);
+                return pointStats;
+            })
+            .collect(Collectors.toList());
+        
+        analysisData.put("knowledgePointAnalysis", knowledgePointAnalysis);
+        
+        // 4. 错题分析
+        List<Map<String, Object>> wrongQuestions = userAnswers.stream()
+            .filter(answer -> answer.getResultScore() < 100)
+            .map(answer -> {
+                Map<String, Object> wrongQuestion = new HashMap<>();
+                QuestionVO question = questionVOs.stream()
+                    .filter(q -> q.getId().equals(answer.getQuestionBankId()))
+                    .findFirst()
+                    .orElse(null);
+                
+                if (question != null) {
+                    wrongQuestion.put("questionContent", question.getContent());
+                    wrongQuestion.put("correctAnswer", question.getAnswer());
+                    wrongQuestion.put("userAnswer", answer.getChoices());
+                    wrongQuestion.put("analysis", question.getAnalysis());
+                    wrongQuestion.put("knowledgeTags", question.getTags());
+                }
+                return wrongQuestion;
+            })
+            .collect(Collectors.toList());
+        
+        analysisData.put("wrongQuestions", wrongQuestions);
+        
+        // 5. 学习建议
+        List<String> suggestions = new ArrayList<>();
+        knowledgePointMap.values().stream()
+            .filter(stats -> stats.getMasteryRate() < 0.6)
+            .forEach(stats -> {
+                suggestions.add(String.format("建议加强对'%s'知识点的学习，当前掌握率%.1f%%",
+                    stats.getKnowledgePoint(), stats.getMasteryRate() * 100));
+            });
+        
+        if (suggestions.isEmpty()) {
+            suggestions.add("整体表现不错，建议继续保持！");
+        }
+        analysisData.put("suggestions", suggestions);
+
+        return analysisData;
+    }
+
+    /**
+     * 知识点统计内部类
+     */
+    private static class KnowledgePointStats {
+        private final String knowledgePoint;
+        private int questionCount = 0;
+        private int correctCount = 0;
+        private double totalScore = 0;
+        private double earnedScore = 0;
+
+        public KnowledgePointStats(String knowledgePoint) {
+            this.knowledgePoint = knowledgePoint;
+        }
+
+        public void addQuestion(QuestionVO question, UserAnswer answer) {
+            questionCount++;
+            totalScore += 100; // 每道题满分100分
+            earnedScore += answer.getResultScore();
+            
+            if (answer.getResultScore() >= 100) {
+                correctCount++;
+            }
+        }
+
+        public String getKnowledgePoint() {
+            return knowledgePoint;
+        }
+
+        public int getQuestionCount() {
+            return questionCount;
+        }
+
+        public int getCorrectCount() {
+            return correctCount;
+        }
+
+        public double getMasteryRate() {
+            return totalScore == 0 ? 0 : earnedScore / totalScore;
+        }
+    }
 }

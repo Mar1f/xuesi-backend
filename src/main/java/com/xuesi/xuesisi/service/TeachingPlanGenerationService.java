@@ -1,8 +1,10 @@
 package com.xuesi.xuesisi.service;
 
 import com.xuesi.xuesisi.model.entity.QuestionBank;
+import com.xuesi.xuesisi.model.entity.QuestionScoringResult;
 import com.xuesi.xuesisi.model.entity.TeachingPlan;
-import com.xuesi.xuesisi.model.vo.UserAnswerVO;
+
+import java.util.List;
 
 /**
  * 教学计划生成服务
@@ -10,12 +12,12 @@ import com.xuesi.xuesisi.model.vo.UserAnswerVO;
 public interface TeachingPlanGenerationService {
 
     /**
-     * 根据学生答题结果生成教学计划
+     * 生成教学计划
      *
      * @param questionBank 题库信息
-     * @param userAnswerVO 学生答题结果
-     * @param aiResponse AI评分结果
+     * @param scoringResults 评分结果
+     * @param userAnswerId 用户答题记录ID
      * @return 生成的教学计划
      */
-    TeachingPlan generateTeachingPlan(QuestionBank questionBank, UserAnswerVO userAnswerVO, String aiResponse);
+    TeachingPlan generateTeachingPlan(QuestionBank questionBank, List<QuestionScoringResult> scoringResults, Long userAnswerId);
 } 

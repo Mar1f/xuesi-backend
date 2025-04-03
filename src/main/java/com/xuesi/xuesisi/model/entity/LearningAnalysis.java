@@ -89,6 +89,7 @@ public class LearningAnalysis implements Serializable {
     /**
      * 得分
      */
+    @TableField("total_score")
     private Integer score;
 
     /**
@@ -101,11 +102,11 @@ public class LearningAnalysis implements Serializable {
      */
     private String suggestion;
 
-    /**
-     * 是否为总体评价
-     */
-    @TableField("is_overall")
-    private Boolean isOverall;
+//    /**
+//     * 是否为总体评价
+//     */
+//    @TableField("is_overall")
+//    private Boolean isOverall;
 
     /**
      * 创建时间
