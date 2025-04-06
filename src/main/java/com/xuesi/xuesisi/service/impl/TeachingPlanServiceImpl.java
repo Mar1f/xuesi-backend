@@ -15,11 +15,10 @@ import com.xuesi.xuesisi.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-
-import javax.annotation.Resource;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import javax.annotation.Resource;
 
 /**
  * 教学计划服务实现类
@@ -29,10 +28,10 @@ import java.util.List;
 public class TeachingPlanServiceImpl extends ServiceImpl<TeachingPlanMapper, TeachingPlan> implements TeachingPlanService {
 
     @Resource
-    private UserAnswerService userAnswerService;
+    private QuestionBankService questionBankService;
 
     @Resource
-    private QuestionBankService questionBankService;
+    private UserAnswerService userAnswerService;
 
     @Resource
     private TeachingPlanGenerationService teachingPlanGenerationService;
@@ -55,57 +54,49 @@ public class TeachingPlanServiceImpl extends ServiceImpl<TeachingPlanMapper, Tea
 
     @Override
     public Long generateTeachingPlan(Long userAnswerId) {
-        // 1. 获取用户答题记录
+        if (userAnswerId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        
+        // 1. 获取答题记录
         UserAnswer userAnswer = userAnswerService.getById(userAnswerId);
         if (userAnswer == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "未找到答题记录");
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "答题记录不存在");
         }
-
+        
         // 2. 获取题库信息
         QuestionBank questionBank = questionBankService.getById(userAnswer.getQuestionBankId());
         if (questionBank == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "未找到题库信息");
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题库不存在");
         }
-
-        // 3. 检查是否已存在教学计划
-        TeachingPlan existingPlan = getOne(new LambdaQueryWrapper<TeachingPlan>()
-                .eq(TeachingPlan::getUserAnswerId, userAnswerId)
-                .eq(TeachingPlan::getIsDelete, 0)
-                .orderByDesc(TeachingPlan::getCreateTime)
-                .last("LIMIT 1"));
         
-        if (existingPlan != null) {
-            return existingPlan.getId();
-        }
-
-        // 4. 构建评分结果
+        // 3. 构建评分结果
         QuestionScoringResult scoringResult = new QuestionScoringResult();
-        scoringResult.setQuestionId(userAnswerId);
+        scoringResult.setQuestionId(userAnswer.getId());
         scoringResult.setQuestionType(userAnswer.getQuestionBankType());
         scoringResult.setUserAnswer(userAnswer.getChoices());
         scoringResult.setScore(userAnswer.getResultScore());
         scoringResult.setAnalysis(userAnswer.getResultDesc());
         List<QuestionScoringResult> scoringResults = Collections.singletonList(scoringResult);
-
-        // 5. 生成教学计划
-        TeachingPlan teachingPlan = teachingPlanGenerationService.generateTeachingPlan(questionBank, scoringResults, userAnswerId);
         
-        // 6. 保存教学计划
+        // 4. 调用生成服务
         try {
-            save(teachingPlan);
-            return teachingPlan.getId();
-        } catch (DuplicateKeyException e) {
-            // 如果出现主键重复，说明可能并发生成了教学计划
-            // 重新查询最新的教学计划
-            TeachingPlan latestPlan = getOne(new LambdaQueryWrapper<TeachingPlan>()
-                    .eq(TeachingPlan::getUserAnswerId, userAnswerId)
-                    .eq(TeachingPlan::getIsDelete, 0)
-                    .orderByDesc(TeachingPlan::getCreateTime)
-                    .last("LIMIT 1"));
-            if (latestPlan != null) {
-                return latestPlan.getId();
+            TeachingPlan teachingPlan = teachingPlanGenerationService.generateTeachingPlan(
+                    questionBank, scoringResults, userAnswerId
+            );
+            
+            // 5. 返回教学计划ID
+            if (teachingPlan != null && teachingPlan.getId() != null) {
+                return teachingPlan.getId();
+            } else {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教学计划失败");
             }
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教学计划失败");
+        } catch (BusinessException e) {
+            // 保留业务异常的详细信息，直接向上抛出
+            throw e;
+        } catch (Exception e) {
+            // 包装其他异常为业务异常
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教学计划失败：" + e.getMessage());
         }
     }
 

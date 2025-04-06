@@ -28,46 +28,57 @@ public class TeachingPlanController {
     @Resource
     private UserAnswerService userAnswerService;
 
+    /**
+     * 获取教学计划
+     *
+     * @param userAnswerId 用户答题记录ID
+     * @return 教学计划
+     */
     @GetMapping("/get")
     public BaseResponse<TeachingPlan> getTeachingPlan(@RequestParam Long userAnswerId) {
+        log.info("开始获取教案，答题记录ID：{}", userAnswerId);
         if (userAnswerId == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
-        log.info("开始获取教案，答题记录ID：{}", userAnswerId);
-        
-        // 首先验证答题记录是否存在
+        // 获取答题记录
         UserAnswer userAnswer = userAnswerService.getById(userAnswerId);
-        if (userAnswer == null) {
-            log.warn("答题记录不存在，ID：{}", userAnswerId);
+        if (userAnswer == null || userAnswer.getIsDelete() != null && userAnswer.getIsDelete() == 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "答题记录不存在");
         }
         log.info("找到答题记录：{}", userAnswer);
         
-        // 查询教案
-        TeachingPlan plan = teachingPlanService.getByUserAnswerId(userAnswerId);
-                
-        if (plan == null) {
-            log.info("未找到教案，尝试重新生成，答题记录ID：{}", userAnswerId);
-            try {
-                Long planId = teachingPlanService.generateTeachingPlan(userAnswerId);
-                if (planId != null) {
-                    plan = teachingPlanService.getById(planId);
-                    log.info("重新生成教案成功：{}", plan);
-                }
-            } catch (Exception e) {
-                log.error("重新生成教案失败", e);
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成教案失败：" + e.getMessage());
+        // 获取已有教案
+        TeachingPlan teachingPlan = teachingPlanService.getByUserAnswerId(userAnswerId);
+        if (teachingPlan != null) {
+            return ResultUtils.success(teachingPlan);
+        }
+        
+        // 重新生成教案
+        log.info("未找到教案，尝试重新生成，答题记录ID：{}", userAnswerId);
+        try {
+            Long teachingPlanId = teachingPlanService.generateTeachingPlan(userAnswerId);
+            if (teachingPlanId != null) {
+                teachingPlan = teachingPlanService.getById(teachingPlanId);
+                log.info("重新生成教案成功：{}", teachingPlan);
+                return ResultUtils.success(teachingPlan);
+            } else {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教案失败：返回的ID为空");
             }
-        } else {
-            log.info("找到教案：{}", plan);
+        } catch (BusinessException e) {
+            log.error("重新生成教案失败", e);
+            
+            // 根据错误类型提供详细的错误信息
+            String errorMsg = "生成教案失败：" + e.getMessage();
+            if (e.getMessage().contains("Expected a ',' or ']'") || 
+                e.getMessage().contains("JSON")) {
+                errorMsg = "AI生成的教案格式有误，请稍后重试";
+            }
+            
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, errorMsg);
+        } catch (Exception e) {
+            log.error("重新生成教案失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成教案失败，服务器内部错误");
         }
-        
-        if (plan == null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "获取教案失败");
-        }
-        
-        return ResultUtils.success(plan);
     }
 
     /**

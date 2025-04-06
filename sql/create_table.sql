@@ -199,10 +199,7 @@ CREATE TABLE `learning_analysis` (
         KEY `idx_class_id` (`class_id`),
         KEY `idx_question_bank_id` (`question_bank_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='学习分析统计表';
--- 为learning_analysis表添加知识点统计字段
-ALTER TABLE learning_analysis
-    ADD COLUMN
-    ADD COLUMN
+
 
 -- ----------------------------
 -- 知识点表
