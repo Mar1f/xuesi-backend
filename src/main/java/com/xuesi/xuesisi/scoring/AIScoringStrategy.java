@@ -34,7 +34,7 @@ import org.springframework.context.ApplicationEventPublisher;
  */
 @Component
 @Slf4j
-@ScoringStrategyConfig(appType = 0, scoringStrategy = 1)
+@ScoringStrategyConfig(questionBankType = 0, scoringStrategy = 1)
 public class AIScoringStrategy implements ScoringStrategy {
 
     @Resource
@@ -91,7 +91,7 @@ public class AIScoringStrategy implements ScoringStrategy {
         UserAnswer userAnswer = saveResultsWithRetry(questionBank, choices, totalScore, scoringResults, questions);
 
         // 在保存结果后，发布事件通知教学计划生成
-        eventPublisher.publishEvent(new TeachingPlanGenerationEvent(questionBank, scoringResults));
+        // eventPublisher.publishEvent(new TeachingPlanGenerationEvent(questionBank, scoringResults)); // Commented out to disable automatic teaching plan generation
 
         return userAnswer;
     }

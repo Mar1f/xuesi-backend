@@ -27,4 +27,9 @@ public class CreateClass {
      * 班级描述
      */
     private String description;
+
+    /**
+     * 学科
+     */
+    private String subject;
 }

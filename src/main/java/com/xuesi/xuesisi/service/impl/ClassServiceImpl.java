@@ -70,7 +70,26 @@ public class ClassServiceImpl extends ServiceImpl<ClassMapper, Class> implements
         if (!success) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR);
         }
-        return classEntity.getId();
+        
+        // Automatically add the primary teacher to the teacher_class association
+        Long classId = classEntity.getId(); // Get the ID after saving
+        Long teacherId = createClass.getTeacherId().longValue();
+        String subject = createClass.getSubject();
+        
+        if (subject != null && !subject.isEmpty()) {
+            try {
+                // Call the existing method to add the teacher-class link
+                addTeacherToClass(classId, teacherId, subject);
+            } catch (BusinessException e) {
+                // Catch potential errors (e.g., if the association already exists)
+                // but don't fail the entire class creation. Log the error manually if needed.
+                System.err.println("Warning: Failed to automatically add teacher " + teacherId + " to class " + classId + " with subject '" + subject + "'. Reason: " + e.getMessage());
+                // Alternatively, re-throw if this failure should prevent class creation, 
+                // or handle it based on specific application requirements.
+            }
+        }
+        
+        return classId;
     }
 
     @Override

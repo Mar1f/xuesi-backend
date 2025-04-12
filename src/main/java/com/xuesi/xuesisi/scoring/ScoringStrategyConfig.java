@@ -16,7 +16,7 @@ public @interface ScoringStrategyConfig {
      * 应用类型
      * @return
      */
-    int appType();
+    int questionBankType();
 
     /**
      * 评分策略

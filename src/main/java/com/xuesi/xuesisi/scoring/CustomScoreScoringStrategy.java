@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 /**
  * 得分类题目评分策略
  */
-@ScoringStrategyConfig(appType = 0, scoringStrategy = 0)
+@ScoringStrategyConfig(questionBankType = 0, scoringStrategy = 0)
 public class CustomScoreScoringStrategy implements ScoringStrategy {
 
     @Resource

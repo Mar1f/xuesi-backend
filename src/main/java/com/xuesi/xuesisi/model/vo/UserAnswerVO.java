@@ -28,9 +28,9 @@ public class UserAnswerVO implements Serializable {
     private Long questionBankId;
 
     /**
-     * 应用类型（0-得分类，1-角色测评类）
+     * 类型: 0-单选, 1-多选，2-填空，3-简答',
      */
-    private Integer appType;
+    private Integer questionBankType;
 
     /**
      * 评分策略（0-自定义，1-AI）

@@ -2049,8 +2049,11 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         // 检查题库是否存在
         QuestionBank questionBank = getById(questionBankId);
         if (questionBank == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题库不存在");
         }
+        
+        // *** Get the type from the Question Bank ***
+        Integer bankType = questionBank.getQuestionBankType(); 
 
         // 获取题库中的题目列表
         List<QuestionBankQuestion> questionBankQuestions = questionBankQuestionService.list(
@@ -2071,7 +2074,7 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
         // 获取题目详情
         List<Question> questions = questionService.listByIds(questionIds);
         
-        // 转换为VO并保持顺序
+        // 转换为VO并保持顺序，同时添加题库类型
         Map<Long, Integer> orderMap = new HashMap<>();
         for (QuestionBankQuestion qbq : questionBankQuestions) {
             orderMap.put(qbq.getQuestionId(), qbq.getQuestionOrder());
@@ -2079,8 +2082,12 @@ public class QuestionBankServiceImpl extends ServiceImpl<QuestionBankMapper, Que
 
         return questions.stream()
             .map(question -> {
-                QuestionVO vo = QuestionVO.objToVo(question);
+                QuestionVO vo = QuestionVO.objToVo(question); // Existing conversion
                 vo.setQuestionOrder(orderMap.get(question.getId()));
+                
+                // *** Set the questionType from the bankType ***
+                vo.setQuestionType(bankType); 
+                
                 return vo;
             })
             .sorted(Comparator.comparing(QuestionVO::getQuestionOrder))

@@ -97,7 +97,7 @@ public class UserAnswerServiceImpl extends ServiceImpl<UserAnswerMapper, UserAns
         QueryWrapper<UserAnswer> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(ObjectUtils.isNotEmpty(notId), "id", notId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
-        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
+        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "UserAnswerId", userId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(resultId), "resultId", resultId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(questionBankId), "questionBankId", questionBankId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(QuestionBankType), "QuestionBankType", QuestionBankType);

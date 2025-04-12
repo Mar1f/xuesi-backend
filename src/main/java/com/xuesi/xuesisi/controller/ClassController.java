@@ -48,12 +48,16 @@ public class ClassController {
         if (teacher == null || !"teacher".equals(teacher.getUserRole())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "教师不存在");
         }
+        if (classEntity.getSubject() == null || classEntity.getSubject().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "学科不能为空");
+        }
         
         CreateClass createClass = new CreateClass();
         createClass.setClassName(classEntity.getClassName());
         createClass.setTeacherId(classEntity.getTeacherId().intValue());
         createClass.setGrade(classEntity.getGrade());
         createClass.setDescription(classEntity.getDescription());
+        createClass.setSubject(classEntity.getSubject());
         
         Long classId = classService.createClass(createClass);
         return ResultUtils.success(classId);
