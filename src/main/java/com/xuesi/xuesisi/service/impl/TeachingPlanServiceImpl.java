@@ -135,18 +135,28 @@ public class TeachingPlanServiceImpl extends ServiceImpl<TeachingPlanMapper, Tea
         if (teachingPlan == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
+
         // 验证必要字段
-        if (teachingPlan.getUserId() == null || teachingPlan.getQuestionBankId() == null) {
+        Long questionBankId = teachingPlan.getQuestionBankId();
+        if (teachingPlan.getUserId() == null || questionBankId == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID和题库ID不能为空");
         }
-        
+
+        // 获取题库信息以填充 subject 和 title
+        QuestionBank questionBank = questionBankService.getById(questionBankId);
+        if (questionBank == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "关联的题库不存在，ID: " + questionBankId);
+        }
+        // Set subject and title from QuestionBank
+        teachingPlan.setSubject(questionBank.getSubject()); // Assuming subject is also set here
+        teachingPlan.setTitle(questionBank.getTitle()); // Corrected: Use getTitle()
+
         // 保存教案
         boolean success = save(teachingPlan);
         if (!success) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "创建教案失败");
         }
-        
+
         return teachingPlan;
     }
 
@@ -155,19 +165,43 @@ public class TeachingPlanServiceImpl extends ServiceImpl<TeachingPlanMapper, Tea
         if (teachingPlan == null || teachingPlan.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        
+
         // 验证教案是否存在
         TeachingPlan existingPlan = getById(teachingPlan.getId());
         if (existingPlan == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "教案不存在");
         }
-        
+
+        // 检查是否需要更新 subject 和 title (e.g., if questionBankId is part of the update)
+        Long questionBankId = teachingPlan.getQuestionBankId();
+        if (questionBankId != null && !questionBankId.equals(existingPlan.getQuestionBankId())) {
+            // If questionBankId changed, fetch new QuestionBank and update title/subject
+            QuestionBank questionBank = questionBankService.getById(questionBankId);
+            if (questionBank == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "关联的题库不存在，ID: " + questionBankId);
+            }
+            teachingPlan.setSubject(questionBank.getSubject());
+            teachingPlan.setTitle(questionBank.getTitle()); // Corrected: Use getTitle()
+        } else if (teachingPlan.getTitle() == null && existingPlan.getQuestionBankId() != null) {
+            // If title is not provided in update payload, but bank exists, ensure it's set
+             QuestionBank questionBank = questionBankService.getById(existingPlan.getQuestionBankId());
+             if (questionBank != null) {
+                 teachingPlan.setTitle(questionBank.getTitle()); // Corrected: Use getTitle()
+                 // Optionally set subject too if needed
+                 if (teachingPlan.getSubject() == null) {
+                     teachingPlan.setSubject(questionBank.getSubject());
+                 }
+             }
+        }
+
         // 更新教案
         boolean success = updateById(teachingPlan);
         if (!success) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新教案失败");
         }
-        
-        return teachingPlan;
+
+        // 返回更新后的完整对象 (updateById might not return the full updated object depending on config)
+        // It's safer to return getById(teachingPlan.getId()) or ensure teachingPlan object has all fields
+        return getById(teachingPlan.getId()); // Return the fresh object from DB
     }
 }

@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS `teaching_plan` (
        `expected_outcomes` json COMMENT '预期学习成果（JSON格式）',
        `evaluation_methods` json COMMENT '评估方法（JSON格式）',
         `subject` VARCHAR(50) COMMENT '学科',
+       `title` VARCHAR(50) COMMENT '教案标题',
        `knowledge_points` JSON COMMENT '知识点列表',
        `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
        `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

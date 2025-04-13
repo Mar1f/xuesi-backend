@@ -9,6 +9,7 @@
         <result property="questionBankId" column="question_bank_id" jdbcType="BIGINT"/>
         <result property="userId" column="user_id" jdbcType="BIGINT"/>
         <result property="userAnswerId" column="user_answer_id" jdbcType="BIGINT"/>
+        <result property="title" column="title" jdbcType="VARCHAR"/>
         <result property="subject" column="subject" jdbcType="VARCHAR"/>
         <result property="knowledgePoints" column="knowledge_points" 
                 typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>

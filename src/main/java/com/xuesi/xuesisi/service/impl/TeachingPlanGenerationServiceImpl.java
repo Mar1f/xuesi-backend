@@ -79,6 +79,7 @@ public class TeachingPlanGenerationServiceImpl extends ServiceImpl<TeachingPlanM
             
             // 直接设置题库中的原始学科，保留教育阶段信息（如"高中数学"）
             teachingPlan.setSubject(questionBank.getSubject());
+            teachingPlan.setTitle(questionBank.getTitle()); // Set title from QuestionBank
             
             // 解析AI响应并填充教学计划
             generateTeachingPlan(cleanedResponse, teachingPlan);
@@ -1136,6 +1137,7 @@ public class TeachingPlanGenerationServiceImpl extends ServiceImpl<TeachingPlanM
             
         // 直接使用题库中的原始学科，保留教育阶段信息（如"高中数学"）
         teachingPlan.setSubject(questionBank.getSubject());
+        teachingPlan.setTitle(questionBank.getTitle()); // Set title from QuestionBank
         
         // 设置知识点列表
         List<String> knowledgePoints = new ArrayList<>();

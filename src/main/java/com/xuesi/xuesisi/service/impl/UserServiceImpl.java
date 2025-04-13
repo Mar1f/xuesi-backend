@@ -50,14 +50,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public User getStudentById(Long id) {
         QueryWrapper<User> query = new QueryWrapper<>();
-        query.eq("id", id).eq("user_role", "student");
+        query.eq("id", id).eq("userRole", "student");
         return getOne(query);
     }
 
     @Override
     public List<User> getAllStudents() {
         QueryWrapper<User> query = new QueryWrapper<>();
-        query.eq("user_role", "student");
+        query.eq("userRole", "student");
         return list(query);
     }
 
@@ -96,7 +96,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             
             // 构建查询条件
             QueryWrapper<User> query = new QueryWrapper<>();
-            query.eq("user_role", "student");
+            query.eq("userRole", "student");
             
             // 执行分页查询
             return this.page(page, query);
@@ -305,7 +305,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             }
 
             if (StringUtils.isNotBlank(userRole)) {
-                queryWrapper.eq("user_role", userRole);
+                queryWrapper.eq("userRole", userRole);
             }
 
             if (gender != null) {

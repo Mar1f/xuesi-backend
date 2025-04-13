@@ -53,6 +53,12 @@ public class TeachingPlan implements Serializable {
     private String subject;
 
     /**
+     * 标题
+     */
+    @TableField(value = "title")
+    private String title;
+
+    /**
      * 知识点列表（JSON数组）
      */
     @TableField(value = "knowledge_points", typeHandler = JacksonTypeHandler.class)
@@ -106,4 +112,5 @@ public class TeachingPlan implements Serializable {
     @TableLogic
     @TableField("isDelete")
     private Integer isDelete;
+
 }
